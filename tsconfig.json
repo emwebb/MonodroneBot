@@ -8,6 +8,8 @@
         "noImplicitAny": true
     },
     "files" : [
-        "main.ts"
+        "main.ts",
+        "monodronebot.ts",
+        "commandinterpreter.ts"
     ]
 }
