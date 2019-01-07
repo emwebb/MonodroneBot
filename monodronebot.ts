@@ -38,6 +38,18 @@ export class MonodroneBot {
             .then(console.log)
             .catch(console.error);
     }
+
+    public runCommand(name : string, commandArguments : CommandObject[], scope : ScopeStack, caller : CommandCaller ) : CommandOutput {
+        try {
+            if(this.commands.has(name)) {
+                return this.commands.get(name).call(commandArguments, scope, caller);
+            } else {
+                return new SimpleCommandOutputError("Command does not exist", "Error :  Command '" + name + "' does not exist!");
+            }
+        } catch(error) {
+            return new SimpleCommandOutputError(JSON.stringify(error), "Error :  Command failed with an error : " + JSON.stringify(error));
+        }
+    }
 }
 
 export interface CommandObject {
@@ -78,9 +90,138 @@ export abstract class CommandError implements CommandObject {
     
 }
 
-export interface CommandOutput extends CommandObject{
+class SimpleCommandError extends CommandError {
+    error : string;
+    userError : string;
+        
+    constructor(error : string, userError : string) {
+        super();
+        this.error = error;
+        this.userError = userError;
+    }
+        
+    getUserReadibleError(): string {
+        return this.userError;
+    }
+
+    getErrorString(): string {
+        return this.error;
+    }
+}
+
+export class SimpleCommandOutputError implements CommandOutput {
+
+    error : CommandError;
+
+    constructor(error : string, userError : string) {
+        this.error = new SimpleCommandError(error, userError);
+    }
+
+    hadError(): boolean {
+        return true;
+    }
+    getError(): CommandError {
+        return this.error;
+        
+    }
+    hasNumberValue(): boolean {
+        return false;
+    }
+    getNumberValue(): number {
+        return null;
+    }
+    hasStringValue(): boolean {
+        return true;
+    }
+    getStringValue(): string {
+        return this.error.getStringValue();
+        
+    }
+    getUserValue(): string {
+        throw this.error.getUserValue();
+    }
+    getValueType(): string {
+        return "string";
+    }
+    getValue() {
+       return this.error.getValue();
+    }
+   
+
+
+}
+
+export interface CommandOutput extends CommandObject {
     hadError() : boolean;
     getError() : CommandError;
+}
+
+export class CommandString implements CommandObject {
+
+    value : string;
+
+    constructor(value : string) {
+        this.value = value;
+    }
+
+    hasNumberValue(): boolean {
+        return false;
+    }    
+    getNumberValue(): number {
+        return null;
+    }
+    hasStringValue(): boolean {
+        return true;
+    }
+    getStringValue(): string {
+        return this.value;
+    }
+    getUserValue(): string {
+        return this.value;
+    }
+    getValueType(): string {
+        return "string";
+    }
+    getValue() {
+        return this.value;
+    }
+}
+
+export class CommandNumber implements CommandObject {
+
+    value : number;
+    
+    constructor(value : number) {
+        this.value = value;
+    }
+
+    hasNumberValue(): boolean {
+        return true;
+    }    
+
+    getNumberValue(): number {
+        return this.value;
+    }
+
+    hasStringValue(): boolean {
+        return true;
+    }
+
+    getStringValue(): string {
+        return this.value.toString();
+    }
+
+    getUserValue(): string {
+        return this.value.toString();
+    }
+
+    getValueType(): string {
+        return "number";
+    }
+
+    getValue() {
+        return this.value;
+    }
 }
 
 class Scope extends Map<string,CommandObject> {
@@ -217,7 +358,7 @@ class UserCaller implements CommandCaller {
 
 export interface Command {
     getName() : string;
-    call(input : CommandObject[], scope : ScopeStack, caller : CommandObject) : CommandOutput;
+    call(input : CommandObject[], scope : ScopeStack, caller : CommandCaller) : CommandOutput;
     getRequiredPermission() : string;
     getShortHelpText() : string;
     getLongHelpText() : string;
