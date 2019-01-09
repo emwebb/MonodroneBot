@@ -1,4 +1,5 @@
 import { MonodroneBot, CommandCaller, CommandOutput, SimpleCommandOutputError, ScopeStack, CommandObject, CommandString, CommandNumber } from "./monodronebot";
+const unescapeString : ((escaped : string) => string) = require("unescape-js");
 
 class CommandInterpreter {
     bot : MonodroneBot;
@@ -112,8 +113,7 @@ class Lexer {
         if(this.command.charAt(this.charIndex) == "\""){
             this.lexeme += this.command.charAt(this.charIndex);
             this.charIndex++;
-            return 
-
+            return this.quotedString();
         }
     }
 
@@ -151,14 +151,30 @@ class Lexer {
         if(stackCounter == 0) {
             return new Token(this.lexeme,TokenType.IMBEDDED_COMMAND, this.stringValue);
         } else {
-            throw new SimpleCommandOutputError("Imbedded command bracket at " + this.charIndex,
+            throw new SimpleCommandOutputError("Imbedded command bracket at " + this.charIndex + " has no closing bracket.",
                 "Error: The command you have inputted has a syntax error. An imbedded command bracket does not have a matching close bracket.\n" + 
                 "```\n" + this.command + "\n" + " ".repeat(initBracketPos-1) + "^\n```");
         }
     }
 
-    quotedString() {
+    quotedString() : Token {
+        while(this.charIndex < this.command.length && this.command.charAt(this.charIndex) != "\"") {
+            
+            this.lexeme += this.command.charAt(this.charIndex);
+            this.stringValue += this.command.charAt(this.charIndex);
+            if(this.command.charAt(this.charIndex) == "\\") {
+                this.charIndex ++;
+                if(this.charIndex == this.command.length) {
+                    throw new SimpleCommandOutputError("Escape string not completed at " + this.charIndex,
+                        "Error: The command you have inputted has a syntax error. An escape string was incompleted.\n" + 
+                        "```\n" + this.command + "\n" + " ".repeat(this.charIndex-1) + "^\n```");
+                }
+                this.lexeme += this.command.charAt(this.charIndex);
+                this.stringValue += this.command.charAt(this.charIndex);
+            }
+        }
 
+        
     }
 }
 
