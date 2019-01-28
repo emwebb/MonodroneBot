@@ -1,4 +1,5 @@
 import {Client, GuildChannel, Message} from "discord.js";
+import { CommandInterpreter } from "./commandinterpreter";
 import { stringify } from "querystring";
 let marked = require("marked");
 let TerminalRenderer  = require("marked-terminal");
@@ -14,14 +15,22 @@ export class MonodroneBot {
     commands : Map<string,Command>;
     commandIndicator : string = "$";
     consoleCaller : ConsoleCaller;
+    scopes : Map<string, ScopeStack>;
     constructor(token :string) {
         this.token = token;
         this.client = new Client();
         this.commands = new Map<string,Command>();
         this.consoleCaller = new ConsoleCaller(this);
+        this.scopes = new Map<string,ScopeStack>();
         this.client.on("message",(message : Message) => {
+            console.log("Recieved message! : " + message.content);
             if(message.content.startsWith("$")) {
                 this.consoleCaller.message("Command Recieved : \n" + message.content);
+                let caller = new UserCaller(message);
+                let scope = this.getScope("discord:" + message.channel.id);
+                let interpreter = new CommandInterpreter(this,message.content,caller,scope);
+                let output : CommandOutput = interpreter.interpret();
+                message.reply(output.getUserValue());
             }
             
         });
@@ -39,10 +48,19 @@ export class MonodroneBot {
             .catch(console.error);
     }
 
+    public getScope(id : string) : ScopeStack{
+        if(this.scopes.has(id)){
+            return this.scopes.get(id)!;
+        } else {
+            this.scopes.set(id,new ScopeStack());
+            return this.scopes.get(id)!; 
+        }
+    }
+
     public runCommand(name : string, commandArguments : CommandObject[], scope : ScopeStack, caller : CommandCaller ) : CommandOutput {
         try {
             if(this.commands.has(name)) {
-                return this.commands.get(name).call(commandArguments, scope, caller);
+                return this.commands.get(name)!.call(commandArguments, scope, caller);
             } else {
                 return new SimpleCommandOutputError("Command does not exist", "Error :  Command '" + name + "' does not exist!");
             }
@@ -50,23 +68,32 @@ export class MonodroneBot {
             return new SimpleCommandOutputError(JSON.stringify(error), "Error :  Command failed with an error : " + JSON.stringify(error));
         }
     }
+
+    public registerCommand(command : Command) {
+        this.commands.set(command.getName(),command);
+    }
 }
 
 export interface CommandObject {
     hasNumberValue() : boolean;
-    getNumberValue() : number;
+    getNumberValue() : number | null;
     hasStringValue() : boolean;
-    getStringValue() : string;
+    getStringValue() : string | null;
     getUserValue() : string;
     getValueType() :string;
     getValue() : any;
 }
 
-export abstract class CommandError implements CommandObject {
+export interface CommandObjectWithError {
+    getUserReadibleError() : string;
+    getErrorString() : string;
+}
+
+export abstract class CommandError implements CommandObject , CommandObjectWithError{
     hasNumberValue(): boolean {
         return false;
     }    
-    getNumberValue(): number {
+    getNumberValue(): null {
         return null;
     }
     hasStringValue(): boolean {
@@ -90,7 +117,7 @@ export abstract class CommandError implements CommandObject {
     
 }
 
-class SimpleCommandError extends CommandError {
+export class SimpleCommandError extends CommandError {
     error : string;
     userError : string;
         
@@ -107,6 +134,48 @@ class SimpleCommandError extends CommandError {
     getErrorString(): string {
         return this.error;
     }
+}
+
+export class CommandNull implements CommandObject, CommandObjectWithError {
+    causeOfNull : string;
+
+    constructor(causeOfNull : string) {
+        this.causeOfNull = causeOfNull;
+    }
+
+    getUserReadibleError(): string {
+        return "Error : A value was null. Reason : " + this.causeOfNull;
+    }    
+    
+    getErrorString(): string {
+        return "Null value : " + this.causeOfNull;
+    }
+
+    hasNumberValue(): boolean {
+        return false;
+    }    
+    getNumberValue(): null {
+        return null;
+    }
+    hasStringValue(): boolean {
+        return true;
+    }
+    getStringValue(): string {
+        return "null"
+    }
+    getUserValue(): string {
+       return "NULL";
+    }
+    getValueType(): string {
+        return "null";
+    }
+    getValue() : null {
+        return null;
+    }
+
+ 
+
+
 }
 
 export class SimpleCommandOutputError implements CommandOutput {
@@ -127,7 +196,7 @@ export class SimpleCommandOutputError implements CommandOutput {
     hasNumberValue(): boolean {
         return false;
     }
-    getNumberValue(): number {
+    getNumberValue(): null{
         return null;
     }
     hasStringValue(): boolean {
@@ -138,7 +207,7 @@ export class SimpleCommandOutputError implements CommandOutput {
         
     }
     getUserValue(): string {
-        throw this.error.getUserValue();
+        return this.error.getUserValue();
     }
     getValueType(): string {
         return "string";
@@ -153,7 +222,7 @@ export class SimpleCommandOutputError implements CommandOutput {
 
 export interface CommandOutput extends CommandObject {
     hadError() : boolean;
-    getError() : CommandError;
+    getError() : CommandError | undefined;
 }
 
 export class CommandString implements CommandObject {
@@ -167,7 +236,7 @@ export class CommandString implements CommandObject {
     hasNumberValue(): boolean {
         return false;
     }    
-    getNumberValue(): number {
+    getNumberValue(): null {
         return null;
     }
     hasStringValue(): boolean {
@@ -224,30 +293,63 @@ export class CommandNumber implements CommandObject {
     }
 }
 
-class Scope extends Map<string,CommandObject> {
+export class CommandStringOutput extends CommandString implements CommandOutput {
 
+    error : CommandError | undefined;
+    constructor(value : string, error? : CommandError) {
+        super(value);
+        this.error = error;
+    }
+
+    hadError(): boolean {
+        return this.error != null;
+    }    
+    getError(): CommandError | undefined{
+        return this.error;
+    }
+}
+
+class Scope {
+    scopeMap : Map<string,CommandObject> = new Map<string,CommandObject>();
+    has(key : string) : boolean {
+        return this.scopeMap.has(key);
+    }
+
+    get(key : string) : CommandObject {
+        let value : CommandObject | undefined = this.scopeMap.get(key);
+        if(value == undefined) {
+            return new CommandNull("Variable '" + key + "' does not exist in the current scope.");
+        } else {
+            return value;
+        }
+
+    }
 }
 
 export class ScopeStack {
-    scopes : Array<Scope>
+    scopes: Array<Scope>;
+    constructor() {
+        this.scopes = new Array<Scope>();
+        this.scopes.push(new Scope())
+    }
     getValue(name : string, down? :number) : CommandObject {
-        if(down == null) {
+        if(down == undefined) {
             down = 0;
         }
-        for(let n = this.scopes.length - 1 - down ; n >= 0; n++) {
+        for(let n = this.scopes.length - 1 - down ; n >= 0; n--) {
             if(this.scopes[n].has(name)){
                 return this.scopes[n].get(name)
             }
         }
 
-        return null;
+        return new CommandNull("Variable '" + name + "' does not exist in the current scope.");;
     }
 
     hasValue(name : string, down? :number) : boolean {
         if(down == null) {
             down = 0;
         }
-        for(let n = this.scopes.length - 1 - down ; n >= 0; n++) {
+        for(let n = this.scopes.length - 1 - down ; n >= 0; n--) {
             if(this.scopes[n].has(name)){
                 return true;
             }
@@ -256,8 +358,12 @@ export class ScopeStack {
         return false;
     }
 
-    pop() : Scope {
-        return this.scopes.pop();
+    pop() : Scope | null{
+        if(this.scopes.length > 1) {
+            return this.scopes.pop()!;
+        } else {
+            return null;
+        }
     }
 
     push(scope? : Scope) {

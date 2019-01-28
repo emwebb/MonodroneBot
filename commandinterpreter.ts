@@ -1,7 +1,7 @@
 import { MonodroneBot, CommandCaller, CommandOutput, SimpleCommandOutputError, ScopeStack, CommandObject, CommandString, CommandNumber } from "./monodronebot";
 const unescapeString : ((escaped : string) => string) = require("unescape-js");
 
-class CommandInterpreter {
+export class CommandInterpreter {
     bot : MonodroneBot;
     commandQuery : string;
     caller : CommandCaller;
@@ -14,49 +14,52 @@ class CommandInterpreter {
     }
 
     interpret() : CommandOutput {
-        let lex : Lexer = new Lexer(this.commandQuery, this.bot.commandIndicator);
-        let commandNameToken : Token; 
         try {
-            commandNameToken = lex.next();
-        } catch (error) {
+            let lex : Lexer = new Lexer(this.commandQuery, this.bot.commandIndicator);
+            let commandNameToken : Token = lex.next();
+
+            let commandArguments : Array<CommandObject> = new Array();
+            let nextToken : Token;
+            while((nextToken = lex.next()).type != TokenType.END_OF_COMMAND) {
+                switch (nextToken.type) {
+                    case TokenType.STRING:
+                        commandArguments.push(new CommandString(nextToken.value));
+                        break;
+                    case TokenType.NUMBER:
+                        commandArguments.push(new CommandNumber(nextToken.value));
+                        break;
+                    case TokenType.COMMAND_NAME:
+                        commandArguments.push(new CommandString(nextToken.lexeme));
+                        break;
+                    case TokenType.VARIABLE:
+                        let variableValue : CommandObject | undefined = this.scope.getValue(nextToken.value);
+                        if(variableValue == undefined){
+                        } else {
+                            commandArguments.push(variableValue);
+                        }
+                        break;
+                    case TokenType.IMBEDDED_COMMAND:
+                        this.scope.push();
+                        let interpreter : CommandInterpreter = new CommandInterpreter(this.bot,nextToken.value,this.caller, this.scope);
+                        let commandOutput : CommandOutput = interpreter.interpret();
+                        commandArguments.push(commandOutput);
+                        this.scope.pop();
+                        break;
+                    case TokenType.WHITE_SPACE :
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            return this.bot.runCommand(commandNameToken.value, commandArguments, this.scope, this.caller);
+        } catch(error) {
             if(error instanceof SimpleCommandOutputError) {
                 return error;
             } else {
-                return new SimpleCommandOutputError(JSON.stringify(error),"Error : There was an unexpected while interpreting the command : " + JSON.stringify(error));
+                return new SimpleCommandOutputError((<Error>error).message + "\n" + (<Error>error).stack ,"Error : There was an unexpected while interpreting the command : " + (<Error>error).message + "\n" + (<Error>error).stack);
             }
         }
-        let commandArguments : Array<CommandObject> = new Array();
-        let nextToken : Token;
-        while((nextToken = lex.next()).type != TokenType.END_OF_COMMAND) {
-            switch (nextToken.type) {
-                case TokenType.STRING:
-                    commandArguments.push(new CommandString(nextToken.value));
-                    break;
-                case TokenType.NUMBER:
-                    commandArguments.push(new CommandNumber(nextToken.value));
-                    break;
-                case TokenType.COMMAND_NAME:
-                    commandArguments.push(new CommandString(nextToken.lexeme));
-                    break;
-                case TokenType.VARIABLE:
-                    let variableValue : CommandObject = this.scope.getValue(nextToken.value);
-                    commandArguments.push(variableValue);
-                    break;
-                case TokenType.IMBEDDED_COMMAND:
-                    this.scope.push();
-                    let interpreter : CommandInterpreter = new CommandInterpreter(this.bot,nextToken.value,this.caller, this.scope);
-                    let commandOutput : CommandOutput = interpreter.interpret();
-                    commandArguments.push(commandOutput);
-                    this.scope.pop();
-                    break;
-                case TokenType.WHITE_SPACE :
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        this.bot.runCommand(commandNameToken.value, commandArguments, this.scope, this.caller);
     }
 }
 
@@ -92,12 +95,16 @@ class Lexer {
         this.command = command;
         this.commandIndicator = commandIndicator;
         this.charIndex = 0;
+        this.lexeme = "";
+        this.stringValue = "";
     }
 
     next() : Token {
         this.lexeme = "";
         this.stringValue = "";
-
+        if(this.charIndex == this.command.length) {
+            return new Token(this.lexeme,TokenType.END_OF_COMMAND,this.stringValue);
+        }
         if(this.command.substr(this.charIndex, this.charIndex + this.commandIndicator.length) == this.commandIndicator) {
             this.lexeme += this.command.substr(this.charIndex, this.charIndex + this.commandIndicator.length);
             this.charIndex += this.commandIndicator.length;
@@ -115,6 +122,23 @@ class Lexer {
             this.charIndex++;
             return this.quotedString();
         }
+
+        if(this.command.charAt(this.charIndex) == "{") {
+            this.lexeme += this.command.charAt(this.charIndex);
+            this.charIndex++;
+            return this.variable();
+        }
+
+        if(LexerUtils.isWhitespace(this.command.charAt(this.charIndex))) {
+            this.lexeme += this.command.charAt(this.charIndex);
+            this.stringValue += this.command.charAt(this.charIndex);
+            this.charIndex++;
+            return this.whitespace();
+        }
+
+        return this.stringNumber();
+
+
     }
 
     commandName() : Token {
@@ -147,6 +171,7 @@ class Lexer {
                 this.stringValue += this.command.charAt(this.charIndex) ;
             }
             this.lexeme += this.command.charAt(this.charIndex) ;
+            this.charIndex++;
         }
         if(stackCounter == 0) {
             return new Token(this.lexeme,TokenType.IMBEDDED_COMMAND, this.stringValue);
@@ -172,22 +197,82 @@ class Lexer {
                 this.lexeme += this.command.charAt(this.charIndex);
                 this.stringValue += this.command.charAt(this.charIndex);
             }
+
+            this.charIndex++;
         }
 
-        
+        if(this.charIndex == this.command.length) {
+            throw new SimpleCommandOutputError("String does not have matching close quatation mark.",
+                "Error: The command you have inputted has a syntax error. A string was incomplete.");
+        }
+
+        this.lexeme += this.command.charAt(this.charIndex);
+        this.stringValue = unescapeString(this.stringValue);
+        this.charIndex++
+        return new Token(this.lexeme, TokenType.STRING, this.stringValue);
+    }
+
+    stringNumber() : Token {
+        while(this.charIndex < this.command.length && this.command.charAt(this.charIndex) != " ") {
+            
+            this.lexeme += this.command.charAt(this.charIndex);
+            this.stringValue += this.command.charAt(this.charIndex);
+            this.charIndex++;
+        }
+        if(isNaN(Number(this.stringValue))) {
+            return new Token(this.lexeme,TokenType.STRING,this.stringValue);
+        } else {
+            return new Token(this.lexeme,TokenType.NUMBER,Number(this.stringValue));
+        }
+
+    }
+
+    variable() : Token {
+        while(this.command.charAt(this.charIndex) != "}" && this.charIndex < this.command.length) {
+            if(!LexerUtils.isAlphanumeric(this.command.charAt(this.charIndex))) {
+                throw new SimpleCommandOutputError("None Alphanumeric character at " + this.charIndex,
+                        "Error: The command you have inputted has a syntax error. Variable names must be alphanumeric.\n" + 
+                        "```\n" + this.command + "\n" + " ".repeat(this.charIndex-1) + "^\n```");
+            }
+            this.lexeme += this.command.charAt(this.charIndex);
+            this.stringValue += this.command.charAt(this.charIndex);
+            this.charIndex++;
+        }
+        if(this.charIndex == this.command.length) {
+            throw new SimpleCommandOutputError("Variable does not have matching close bracket.",
+                "Error: The command you have inputted has a syntax error. A bracket was incomplete.");
+        }
+        this.lexeme += this.command.charAt(this.charIndex);
+        this.charIndex++;
+        return new Token(this.lexeme, TokenType.VARIABLE, this.stringValue);
+    }
+
+    whitespace() : Token {
+        while(this.charIndex < this.command.length && LexerUtils.isWhitespace(this.command.charAt(this.charIndex))) {
+            
+            this.lexeme += this.command.charAt(this.charIndex);
+            this.stringValue += this.command.charAt(this.charIndex);
+            this.charIndex++;
+        }
+
+        return new Token(this.lexeme,TokenType.WHITE_SPACE,this.stringValue);
     }
 }
 
 class LexerUtils {
     static isAlphanumeric(checkee : string) {
-        return checkee.match(/^[a-Z0-9]+$/i).length > 0;
+        return checkee.match(/^[A-z0-9]+$/i) != null;
     }
 
     static isValidStringStarter(checkee : string) {
-        return checkee.match(/^[^0-9 ]+$/i).length > 0;
+        return checkee.match(/^[^0-9 ]+$/i) != null;
     }
 
     static isNumeric(checkee : string) {
-        return checkee.match(/^[0-9]+$/i).length > 0;
+        return checkee.match(/^[0-9\-\+]+$/i) != null;
+    }
+
+    static isWhitespace(checkee : string) {
+        return checkee.match(/^[ \t\n\r]+$/i) != null;
     }
 }
