@@ -1,6 +1,7 @@
-import {Client, GuildChannel, Message} from "discord.js";
+import {Client, GuildChannel, Message, User, GuildMember} from "discord.js";
 import { CommandInterpreter } from "./commandinterpreter";
-import { stringify } from "querystring";
+import fs = require("fs");
+import { EventEmitter } from "events";
 let marked = require("marked");
 let TerminalRenderer  = require("marked-terminal");
 
@@ -9,24 +10,49 @@ marked.setOptions({
     renderer: new TerminalRenderer()
 });
 
-export class MonodroneBot {
-    client : Client;
-    token : string;
-    commands : Map<string,Command>;
-    commandIndicator : string = "$";
-    consoleCaller : ConsoleCaller;
-    scopes : Map<string, ScopeStack>;
-    constructor(token :string) {
-        this.token = token;
+export class MonodroneBot extends EventEmitter{
+    private client : Client;
+    private token : string;
+    private commands : Map<string,Command>;
+    private commandIndicator : string = "$";
+    private consoleCaller : ConsoleCaller;
+    private scopes : Map<string, ScopeStack>;
+    private permissionManager : PermissionManager;
+    private modules : Map<string, Module>;
+    private configLoader : ConfigLoader;
+
+    constructor(token? :string) {
+
+        
+        super();
         this.client = new Client();
         this.commands = new Map<string,Command>();
         this.consoleCaller = new ConsoleCaller(this);
         this.scopes = new Map<string,ScopeStack>();
+        this.permissionManager = new PermissionManager();
+        this.modules = new Map<string,Module>();
+        this.configLoader = new ConfigLoader();
+        
+        this.permissionManager.loadFromConfig(this.configLoader.get("permissions"));
+
+
+        if(token != undefined) {
+            this.token = token;
+        } else {
+            this.token = this.configLoader.get("token");
+        }
+
+        let commandIndicator = this.configLoader.get("commandIndicator");
+        if(commandIndicator == undefined) {
+            commandIndicator = "$";
+        }
+        this.commandIndicator = commandIndicator;
+
         this.client.on("message",(message : Message) => {
             console.log("Recieved message! : " + message.content);
             if(message.content.startsWith("$")) {
                 this.consoleCaller.message("Command Recieved : \n" + message.content);
-                let caller = new UserCaller(message);
+                let caller = new UserCaller(message,this);
                 let scope = this.getScope("discord:" + message.channel.id);
                 let interpreter = new CommandInterpreter(this,message.content,caller,scope);
                 let output : CommandOutput = interpreter.interpret();
@@ -34,6 +60,7 @@ export class MonodroneBot {
             }
             
         });
+        this.emit("start");
     }
 
     public login() {
@@ -43,6 +70,17 @@ export class MonodroneBot {
     }
 
     public stop() {
+        this.emit("stop");
+        this.configLoader.set("permissions",this.permissionManager.saveToConfig());
+        this.configLoader.set("token",this.token);
+        this.configLoader.set("commandIndicator",this.commandIndicator)
+        for(let moduleName in this.modules.keys()) {
+            this.modules.get(moduleName)!.configsSave();
+            this.modules.get(moduleName)!.deregister();
+            this.modules.delete(moduleName);
+        }
+        
+        this.configLoader.save();
         this.client.destroy()
             .then(console.log)
             .catch(console.error);
@@ -60,17 +98,87 @@ export class MonodroneBot {
     public runCommand(name : string, commandArguments : CommandObject[], scope : ScopeStack, caller : CommandCaller ) : CommandOutput {
         try {
             if(this.commands.has(name)) {
-                return this.commands.get(name)!.call(commandArguments, scope, caller);
+                return this.commands.get(name)!.call(commandArguments, scope, caller, this);
             } else {
                 return new SimpleCommandOutputError("Command does not exist", "Error :  Command '" + name + "' does not exist!");
             }
         } catch(error) {
+            console.log(error);
+            if(error instanceof Error) {
+                return new SimpleCommandOutputError(error.name + "\n" + error.message + "\n" + error.stack, "Error :  Command failed with an error : " + error.message);
+            }
             return new SimpleCommandOutputError(JSON.stringify(error), "Error :  Command failed with an error : " + JSON.stringify(error));
         }
     }
 
     public registerCommand(command : Command) {
         this.commands.set(command.getName(),command);
+    }
+
+    public deregisterCommand(commandName : string) {
+        this.commands.delete(commandName);
+    }
+
+    public registerModule(module : Module) {
+        module.register(this);
+        this.modules.set(module.getId(),module);
+    }
+
+    public dergisterModule(moduleId : string) {
+        if(this.modules.has(moduleId)) {
+            this.modules.get(moduleId)!.deregister();
+            this.modules.delete(moduleId);
+        }
+    }
+
+    public getModule(moduleName : string) : Module | undefined {
+        return this.modules.get(moduleName);
+    }
+
+    public getClient() : Client {
+        return this.client;
+    }
+
+    public getCommandIndicator() : string {
+        return this.commandIndicator;
+    }
+
+    public getConfigLoader() : ConfigLoader {
+        return this.configLoader;
+    }
+
+    public getPermissionManager() : PermissionManager {
+        return this.permissionManager;
+    }
+
+    public getCommands() : Map<string,Command> {
+        return this.commands;
+    }
+}
+
+export class ConfigLoader {
+    private config : any;
+    
+    constructor() {
+        if(fs.existsSync("config.json")) {
+            let configString : string = fs.readFileSync("config.json",{"encoding" : "utf8"});
+            this.config = JSON.parse(configString);
+        } else {
+            this.config = {};
+        }
+    }
+
+    get(key : string) : any {
+        return this.config[key];
+    }
+
+    set(key :string, value : any) {
+        this.config[key] = value;
+    }
+
+    save() {
+        let configString : string = JSON.stringify(this.config,undefined,4);
+        fs.writeFileSync("config.json",configString,{encoding:"utf8"});
     }
 }
 
@@ -406,7 +514,7 @@ class ConsoleCaller implements CommandCaller{
             for (let index = 0; index < mentionMatches.length; index++) {
                 const mention = mentionMatches[index];
                 let userId = mention.substring(3,mention.length - 1);
-                let user = await this.bot.client.fetchUser(userId);
+                let user = await this.bot.getClient().fetchUser(userId);
                 let username = "@" + user.tag;
                 let replaceRegex = new RegExp("<@\!" + userId + ">");
                 message = message.replace(replaceRegex,username);
@@ -420,7 +528,7 @@ class ConsoleCaller implements CommandCaller{
             for (let index = 0; index < channelMatches.length; index++) {
                 const channelmention = channelMatches[index];
                 let channelId = channelmention.substring(2,channelmention.length - 1);
-                let channel = this.bot.client.channels.get(channelId);
+                let channel = this.bot.getClient().channels.get(channelId);
                 let channelname = "#" + (<GuildChannel>channel).name;
                 let replaceRegex = new RegExp("<#" + channelId + ">");
                 message = message.replace(replaceRegex,channelname);
@@ -440,15 +548,17 @@ class ConsoleCaller implements CommandCaller{
 class UserCaller implements CommandCaller {
 
     private initMessage : Message;
+    private permissionNode : PermissionNode;
 
-    constructor(message : Message) {
+    constructor(message : Message, bot : MonodroneBot) {
+        this.permissionNode = bot.getPermissionManager().getPermissionsForUser(message.author);
         this.initMessage = message;
     }
     getType(): string {
         return "USER";
     }    
     hasPermission(permission: string): boolean {
-        return true; // TODO : Implement proper permission system.
+        return this.permissionNode.hasPermission(permission);
     }
 
     message(message: string): Promise<any> {
@@ -459,15 +569,164 @@ class UserCaller implements CommandCaller {
         return this.initMessage.author.dmChannel.send(message);
     }
 
+    getRawMessage() : Message {
+        return this.initMessage;
+    }
+}
 
+class PermissionManager {
+    private userPermission: Map<string, PermissionNode> = new Map();
+    private discordRolePermission: Map<string, PermissionNode>  = new Map();
+    private everyonePermission: PermissionNode  = new PermissionNode();
+
+    getPermissionsForUser(user : User) {
+        let permissions = this.everyonePermission;
+
+        let userId = user.id;
+        if(this.userPermission.has(userId)){
+            permissions = PermissionNode.merge(permissions,this.userPermission.get(userId)!);
+        }
+
+        if(user instanceof GuildMember) {
+            let guildMember = <GuildMember>user;
+            guildMember.roles.forEach(role => {
+                let roleId = role.id;
+                if(this.discordRolePermission.has(roleId)){
+                    permissions = PermissionNode.merge(permissions,this.discordRolePermission.get(roleId)!);
+                }
+            });
+        }
+
+        return permissions;
+    }
+
+    loadFromConfig(config : any) {
+
+        if(config == undefined) {
+            return;
+        }
+        if(config["everyone"] != undefined) {
+            this.everyonePermission = PermissionNode.fromJson(config["everyone"]);
+        }
+
+        if(config["userPermission"] != undefined) {
+            for(let key in config["userPermission"]) {
+                this.userPermission.set(key, PermissionNode.fromJson(config["userPermission"][key]));
+            }
+        }
+
+        if(config["discordRolePermission"] != undefined) {
+            for(let key in config["discordRolePermission"]) {
+                this.discordRolePermission.set(key, PermissionNode.fromJson(config["discordRolePermission"][key]));
+            }
+        }
+    }
+    
+    saveToConfig() : any {
+        let config : any = {};
+        config["everyone"] = this.everyonePermission.toJson();
+
+        config["userPermission"] = {};
+        for(let permissionKey in this.userPermission.keys()) {
+            config["userPermission"][permissionKey] = this.userPermission.get(permissionKey)!.toJson();
+        }
+
+        config["discordRolePermission"] = {};
+        for(let permissionKey in this.discordRolePermission.keys()) {
+            config["discordRolePermission"][permissionKey] = this.discordRolePermission.get(permissionKey)!.toJson();
+        }
+
+        return config;
+    }
+}
+
+class PermissionNode {
+    protected children : Map<string,PermissionNode> = new Map();
+
+    hasPermission(permissionArray : Array<string> | string) {
+
+        if(permissionArray instanceof String) {
+            permissionArray = permissionArray.split(".");
+        }
+
+        if(permissionArray.length == 0){
+            return true;
+        }
+
+        if(this.children.has("*")) {
+            return true;
+        }
+
+        if(this.children.has(permissionArray[0])){
+            let newPermissionArray = permissionArray.slice(1,permissionArray.length);
+            this.children.get(permissionArray[0])!.hasPermission(newPermissionArray);
+        }
+
+        return false;
+    }
+
+    clone() : PermissionNode {
+        let clone : PermissionNode = new PermissionNode();
+        for(let key in this.children.keys()) {
+            clone.children.set(key,this.children.get(key)!.clone());
+        }
+        return clone;
+        
+    }
+    
+    static merge(a : PermissionNode, b : PermissionNode) : PermissionNode {
+        let c = new PermissionNode();
+        for(let key in a.children.keys()) {
+            if(b.children.has(key)){
+                c.children.set(key,this.merge(a.children.get(key)!,b.children.get(key)!));
+            } else {
+                c.children.set(key,a.clone());
+            }
+        }
+
+        for(let key in b.children.keys()) {
+            if(!c.children.has(key)){
+                c.children.set(key,b.clone());
+            }
+        }
+
+        return c;
+    }
+    
+    static fromJsonString(jsonString : string) : PermissionNode {
+        return PermissionNode.fromJson(JSON.parse(jsonString));
+    }
+
+    static fromJson(rawJson : any) : PermissionNode {
+        let newNode = new PermissionNode();
+        for(let key in rawJson) {
+            newNode.children.set(key,PermissionNode.fromJson(rawJson[key]));
+        }
+        return newNode;
+    }
+
+    toJson() : any {
+        let asJson : any = {};
+        for(let nodeKey in this.children.keys()) {
+            asJson[nodeKey] = this.children.get(nodeKey)!.toJson();
+        }
+
+        return asJson;
+    }
 }
 
 export interface Command {
     getName() : string;
-    call(input : CommandObject[], scope : ScopeStack, caller : CommandCaller) : CommandOutput;
+    call(input : CommandObject[], scope : ScopeStack, caller : CommandCaller, bot : MonodroneBot) : CommandOutput;
     getRequiredPermission() : string;
     getShortHelpText() : string;
     getLongHelpText() : string;
 }
 
-
+export interface Module {
+    getId() : string;
+    getName() : string;
+    register(bot : MonodroneBot) : void;
+    deregister() : void;
+    configsSave() : void;
+}

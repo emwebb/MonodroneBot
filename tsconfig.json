@@ -10,6 +10,7 @@
     "files" : [
         "main.ts",
         "monodronebot.ts",
-        "commandinterpreter.ts"
+        "commandinterpreter.ts",
+        "modules/core/module.ts"
     ]
 }

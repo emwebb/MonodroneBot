@@ -11,7 +11,7 @@ var CommandInterpreter = /** @class */ (function () {
     }
     CommandInterpreter.prototype.interpret = function () {
         try {
-            var lex = new Lexer(this.commandQuery, this.bot.commandIndicator);
+            var lex = new Lexer(this.commandQuery, this.bot.getCommandIndicator());
             var commandNameToken = lex.next();
             var commandArguments = new Array();
             var nextToken = void 0;
@@ -28,11 +28,7 @@ var CommandInterpreter = /** @class */ (function () {
                         break;
                     case TokenType.VARIABLE:
                         var variableValue = this.scope.getValue(nextToken.value);
-                        if (variableValue == undefined) {
-                        }
-                        else {
-                            commandArguments.push(variableValue);
-                        }
+                        commandArguments.push(variableValue);
                         break;
                     case TokenType.IMBEDDED_COMMAND:
                         this.scope.push();

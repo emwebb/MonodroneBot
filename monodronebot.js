@@ -50,32 +50,51 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 Object.defineProperty(exports, "__esModule", { value: true });
 var discord_js_1 = require("discord.js");
 var commandinterpreter_1 = require("./commandinterpreter");
+var fs = require("fs");
+var events_1 = require("events");
 var marked = require("marked");
 var TerminalRenderer = require("marked-terminal");
 marked.setOptions({
     // Define custom renderer
     renderer: new TerminalRenderer()
 });
-var MonodroneBot = /** @class */ (function () {
+var MonodroneBot = /** @class */ (function (_super) {
+    __extends(MonodroneBot, _super);
     function MonodroneBot(token) {
-        var _this = this;
-        this.commandIndicator = "$";
-        this.token = token;
-        this.client = new discord_js_1.Client();
-        this.commands = new Map();
-        this.consoleCaller = new ConsoleCaller(this);
-        this.scopes = new Map();
-        this.client.on("message", function (message) {
+        var _this = _super.call(this) || this;
+        _this.commandIndicator = "$";
+        _this.client = new discord_js_1.Client();
+        _this.commands = new Map();
+        _this.consoleCaller = new ConsoleCaller(_this);
+        _this.scopes = new Map();
+        _this.permissionManager = new PermissionManager();
+        _this.modules = new Map();
+        _this.configLoader = new ConfigLoader();
+        _this.permissionManager.loadFromConfig(_this.configLoader.get("permissions"));
+        if (token != undefined) {
+            _this.token = token;
+        }
+        else {
+            _this.token = _this.configLoader.get("token");
+        }
+        var commandIndicator = _this.configLoader.get("commandIndicator");
+        if (commandIndicator == undefined) {
+            commandIndicator = "$";
+        }
+        _this.commandIndicator = commandIndicator;
+        _this.client.on("message", function (message) {
             console.log("Recieved message! : " + message.content);
             if (message.content.startsWith("$")) {
                 _this.consoleCaller.message("Command Recieved : \n" + message.content);
-                var caller = new UserCaller(message);
+                var caller = new UserCaller(message, _this);
                 var scope = _this.getScope("discord:" + message.channel.id);
                 var interpreter = new commandinterpreter_1.CommandInterpreter(_this, message.content, caller, scope);
                 var output = interpreter.interpret();
                 message.reply(output.getUserValue());
             }
         });
+        _this.emit("start");
+        return _this;
     }
     MonodroneBot.prototype.login = function () {
         this.client.login(this.token)
@@ -83,6 +102,16 @@ var MonodroneBot = /** @class */ (function () {
             .catch(console.error);
     };
     MonodroneBot.prototype.stop = function () {
+        this.emit("stop");
+        this.configLoader.set("permissions", this.permissionManager.saveToConfig());
+        this.configLoader.set("token", this.token);
+        this.configLoader.set("commandIndicator", this.commandIndicator);
+        for (var moduleName in this.modules.keys()) {
+            this.modules.get(moduleName).configsSave();
+            this.modules.get(moduleName).deregister();
+            this.modules.delete(moduleName);
+        }
+        this.configLoader.save();
         this.client.destroy()
             .then(console.log)
             .catch(console.error);
@@ -99,22 +128,80 @@ var MonodroneBot = /** @class */ (function () {
     MonodroneBot.prototype.runCommand = function (name, commandArguments, scope, caller) {
         try {
             if (this.commands.has(name)) {
-                return this.commands.get(name).call(commandArguments, scope, caller);
+                return this.commands.get(name).call(commandArguments, scope, caller, this);
             }
             else {
                 return new SimpleCommandOutputError("Command does not exist", "Error :  Command '" + name + "' does not exist!");
             }
         }
         catch (error) {
+            console.log(error);
+            if (error instanceof Error) {
+                return new SimpleCommandOutputError(error.name + "\n" + error.message + "\n" + error.stack, "Error :  Command failed with an error : " + error.message);
+            }
             return new SimpleCommandOutputError(JSON.stringify(error), "Error :  Command failed with an error : " + JSON.stringify(error));
         }
     };
     MonodroneBot.prototype.registerCommand = function (command) {
         this.commands.set(command.getName(), command);
     };
+    MonodroneBot.prototype.deregisterCommand = function (commandName) {
+        this.commands.delete(commandName);
+    };
+    MonodroneBot.prototype.registerModule = function (module) {
+        module.register(this);
+        this.modules.set(module.getId(), module);
+    };
+    MonodroneBot.prototype.dergisterModule = function (moduleId) {
+        if (this.modules.has(moduleId)) {
+            this.modules.get(moduleId).deregister();
+            this.modules.delete(moduleId);
+        }
+    };
+    MonodroneBot.prototype.getModule = function (moduleName) {
+        return this.modules.get(moduleName);
+    };
+    MonodroneBot.prototype.getClient = function () {
+        return this.client;
+    };
+    MonodroneBot.prototype.getCommandIndicator = function () {
+        return this.commandIndicator;
+    };
+    MonodroneBot.prototype.getConfigLoader = function () {
+        return this.configLoader;
+    };
+    MonodroneBot.prototype.getPermissionManager = function () {
+        return this.permissionManager;
+    };
+    MonodroneBot.prototype.getCommands = function () {
+        return this.commands;
+    };
     return MonodroneBot;
-}());
+}(events_1.EventEmitter));
 exports.MonodroneBot = MonodroneBot;
+var ConfigLoader = /** @class */ (function () {
+    function ConfigLoader() {
+        if (fs.existsSync("config.json")) {
+            var configString = fs.readFileSync("config.json", { "encoding": "utf8" });
+            this.config = JSON.parse(configString);
+        }
+        else {
+            this.config = {};
+        }
+    }
+    ConfigLoader.prototype.get = function (key) {
+        return this.config[key];
+    };
+    ConfigLoader.prototype.set = function (key, value) {
+        this.config[key] = value;
+    };
+    ConfigLoader.prototype.save = function () {
+        var configString = JSON.stringify(this.config, undefined, 4);
+        fs.writeFileSync("config.json", configString, { encoding: "utf8" });
+    };
+    return ConfigLoader;
+}());
+exports.ConfigLoader = ConfigLoader;
 var CommandError = /** @class */ (function () {
     function CommandError() {
     }
@@ -390,7 +477,7 @@ var ConsoleCaller = /** @class */ (function () {
                         if (!(index < mentionMatches.length)) return [3 /*break*/, 4];
                         mention = mentionMatches[index];
                         userId = mention.substring(3, mention.length - 1);
-                        return [4 /*yield*/, this.bot.client.fetchUser(userId)];
+                        return [4 /*yield*/, this.bot.getClient().fetchUser(userId)];
                     case 2:
                         user = _a.sent();
                         username = "@" + user.tag;
@@ -407,7 +494,7 @@ var ConsoleCaller = /** @class */ (function () {
                             for (index = 0; index < channelMatches.length; index++) {
                                 channelmention = channelMatches[index];
                                 channelId = channelmention.substring(2, channelmention.length - 1);
-                                channel = this.bot.client.channels.get(channelId);
+                                channel = this.bot.getClient().channels.get(channelId);
                                 channelname = "#" + channel.name;
                                 replaceRegex = new RegExp("<#" + channelId + ">");
                                 message = message.replace(replaceRegex, channelname);
@@ -425,14 +512,15 @@ var ConsoleCaller = /** @class */ (function () {
     return ConsoleCaller;
 }());
 var UserCaller = /** @class */ (function () {
-    function UserCaller(message) {
+    function UserCaller(message, bot) {
+        this.permissionNode = bot.getPermissionManager().getPermissionsForUser(message.author);
         this.initMessage = message;
     }
     UserCaller.prototype.getType = function () {
         return "USER";
     };
     UserCaller.prototype.hasPermission = function (permission) {
-        return true; // TODO : Implement proper permission system.
+        return this.permissionNode.hasPermission(permission);
     };
     UserCaller.prototype.message = function (message) {
         return this.initMessage.reply(message);
@@ -440,5 +528,128 @@ var UserCaller = /** @class */ (function () {
     UserCaller.prototype.directMessage = function (message) {
         return this.initMessage.author.dmChannel.send(message);
     };
+    UserCaller.prototype.getRawMessage = function () {
+        return this.initMessage;
+    };
     return UserCaller;
+}());
+var PermissionManager = /** @class */ (function () {
+    function PermissionManager() {
+        this.userPermission = new Map();
+        this.discordRolePermission = new Map();
+        this.everyonePermission = new PermissionNode();
+    }
+    PermissionManager.prototype.getPermissionsForUser = function (user) {
+        var _this = this;
+        var permissions = this.everyonePermission;
+        var userId = user.id;
+        if (this.userPermission.has(userId)) {
+            permissions = PermissionNode.merge(permissions, this.userPermission.get(userId));
+        }
+        if (user instanceof discord_js_1.GuildMember) {
+            var guildMember = user;
+            guildMember.roles.forEach(function (role) {
+                var roleId = role.id;
+                if (_this.discordRolePermission.has(roleId)) {
+                    permissions = PermissionNode.merge(permissions, _this.discordRolePermission.get(roleId));
+                }
+            });
+        }
+        return permissions;
+    };
+    PermissionManager.prototype.loadFromConfig = function (config) {
+        if (config == undefined) {
+            return;
+        }
+        if (config["everyone"] != undefined) {
+            this.everyonePermission = PermissionNode.fromJson(config["everyone"]);
+        }
+        if (config["userPermission"] != undefined) {
+            for (var key in config["userPermission"]) {
+                this.userPermission.set(key, PermissionNode.fromJson(config["userPermission"][key]));
+            }
+        }
+        if (config["discordRolePermission"] != undefined) {
+            for (var key in config["discordRolePermission"]) {
+                this.discordRolePermission.set(key, PermissionNode.fromJson(config["discordRolePermission"][key]));
+            }
+        }
+    };
+    PermissionManager.prototype.saveToConfig = function () {
+        var config = {};
+        config["everyone"] = this.everyonePermission.toJson();
+        config["userPermission"] = {};
+        for (var permissionKey in this.userPermission.keys()) {
+            config["userPermission"][permissionKey] = this.userPermission.get(permissionKey).toJson();
+        }
+        config["discordRolePermission"] = {};
+        for (var permissionKey in this.discordRolePermission.keys()) {
+            config["discordRolePermission"][permissionKey] = this.discordRolePermission.get(permissionKey).toJson();
+        }
+        return config;
+    };
+    return PermissionManager;
+}());
+var PermissionNode = /** @class */ (function () {
+    function PermissionNode() {
+        this.children = new Map();
+    }
+    PermissionNode.prototype.hasPermission = function (permissionArray) {
+        if (permissionArray instanceof String) {
+            permissionArray = permissionArray.split(".");
+        }
+        if (permissionArray.length == 0) {
+            return true;
+        }
+        if (this.children.has("*")) {
+            return true;
+        }
+        if (this.children.has(permissionArray[0])) {
+            var newPermissionArray = permissionArray.slice(1, permissionArray.length);
+            this.children.get(permissionArray[0]).hasPermission(newPermissionArray);
+        }
+        return false;
+    };
+    PermissionNode.prototype.clone = function () {
+        var clone = new PermissionNode();
+        for (var key in this.children.keys()) {
+            clone.children.set(key, this.children.get(key).clone());
+        }
+        return clone;
+    };
+    PermissionNode.merge = function (a, b) {
+        var c = new PermissionNode();
+        for (var key in a.children.keys()) {
+            if (b.children.has(key)) {
+                c.children.set(key, this.merge(a.children.get(key), b.children.get(key)));
+            }
+            else {
+                c.children.set(key, a.clone());
+            }
+        }
+        for (var key in b.children.keys()) {
+            if (!c.children.has(key)) {
+                c.children.set(key, b.clone());
+            }
+        }
+        return c;
+    };
+    PermissionNode.fromJsonString = function (jsonString) {
+        return PermissionNode.fromJson(JSON.parse(jsonString));
+    };
+    PermissionNode.fromJson = function (rawJson) {
+        var newNode = new PermissionNode();
+        for (var key in rawJson) {
+            newNode.children.set(key, PermissionNode.fromJson(rawJson[key]));
+        }
+        return newNode;
+    };
+    PermissionNode.prototype.toJson = function () {
+        var asJson = {};
+        for (var nodeKey in this.children.keys()) {
+            asJson[nodeKey] = this.children.get(nodeKey).toJson();
+        }
+        return asJson;
+    };
+    return PermissionNode;
 }());

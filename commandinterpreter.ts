@@ -1,4 +1,4 @@
-import { MonodroneBot, CommandCaller, CommandOutput, SimpleCommandOutputError, ScopeStack, CommandObject, CommandString, CommandNumber } from "./monodronebot";
+import { MonodroneBot, CommandCaller, CommandOutput, SimpleCommandOutputError, ScopeStack, CommandString, CommandNumber, CommandObject } from "./monodronebot";
 const unescapeString : ((escaped : string) => string) = require("unescape-js");
 
 export class CommandInterpreter {
@@ -15,7 +15,7 @@ export class CommandInterpreter {
 
     interpret() : CommandOutput {
         try {
-            let lex : Lexer = new Lexer(this.commandQuery, this.bot.commandIndicator);
+            let lex : Lexer = new Lexer(this.commandQuery, this.bot.getCommandIndicator());
             let commandNameToken : Token = lex.next();
 
             let commandArguments : Array<CommandObject> = new Array();
@@ -32,11 +32,9 @@ export class CommandInterpreter {
                         commandArguments.push(new CommandString(nextToken.lexeme));
                         break;
                     case TokenType.VARIABLE:
-                        let variableValue : CommandObject | undefined = this.scope.getValue(nextToken.value);
-                        if(variableValue == undefined){
-                        } else {
-                            commandArguments.push(variableValue);
-                        }
+                        let variableValue : CommandObject = this.scope.getValue(nextToken.value);
+                        commandArguments.push(variableValue);
+                        
                         break;
                     case TokenType.IMBEDDED_COMMAND:
                         this.scope.push();
