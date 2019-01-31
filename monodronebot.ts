@@ -2,6 +2,9 @@ import {Client, GuildChannel, Message, User, GuildMember} from "discord.js";
 import { CommandInterpreter } from "./commandinterpreter";
 import fs = require("fs");
 import { EventEmitter } from "events";
+import {Mongoose, ConnectionOptions} from "mongoose";
+import { MongoError } from "mongodb";
+
 let marked = require("marked");
 let TerminalRenderer  = require("marked-terminal");
 
@@ -20,6 +23,7 @@ export class MonodroneBot extends EventEmitter{
     private permissionManager : PermissionManager;
     private modules : Map<string, Module>;
     private configLoader : ConfigLoader;
+    private database : Mongoose;
 
     constructor(token? :string) {
 
@@ -34,8 +38,24 @@ export class MonodroneBot extends EventEmitter{
         this.configLoader = new ConfigLoader();
         
         this.permissionManager.loadFromConfig(this.configLoader.get("permissions"));
+        
+        this.database = new Mongoose();
 
-
+        let databaseUrl : string | undefined = this.configLoader.get("mongoDBURL");
+        if(databaseUrl == undefined) {
+            throw new Error("Fatal Error : No mongoDBURL in config.");
+        }  
+        
+        this.database.connect(databaseUrl, {useNewUrlParser: true}, (err: MongoError) => {
+            console.error("Fatal Error : Could Not Connect to MongoDB.");
+            if(err.code) {
+                console.error(err.name);
+                console.error(err.message);
+                console.error(err.stack);
+                process.exit(1);
+            }
+        });
+        
         if(token != undefined) {
             this.token = token;
         } else {
@@ -81,6 +101,8 @@ export class MonodroneBot extends EventEmitter{
         }
         
         this.configLoader.save();
+
+        this.database.disconnect();
         this.client.destroy()
             .then(console.log)
             .catch(console.error);
@@ -153,6 +175,10 @@ export class MonodroneBot extends EventEmitter{
 
     public getCommands() : Map<string,Command> {
         return this.commands;
+    }
+
+    public getDatabase() : Mongoose {
+        return this.database;
     }
 }
 

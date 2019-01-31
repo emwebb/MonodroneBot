@@ -52,6 +52,7 @@ var discord_js_1 = require("discord.js");
 var commandinterpreter_1 = require("./commandinterpreter");
 var fs = require("fs");
 var events_1 = require("events");
+var mongoose_1 = require("mongoose");
 var marked = require("marked");
 var TerminalRenderer = require("marked-terminal");
 marked.setOptions({
@@ -71,6 +72,20 @@ var MonodroneBot = /** @class */ (function (_super) {
         _this.modules = new Map();
         _this.configLoader = new ConfigLoader();
         _this.permissionManager.loadFromConfig(_this.configLoader.get("permissions"));
+        _this.database = new mongoose_1.Mongoose();
+        var databaseUrl = _this.configLoader.get("mongoDBURL");
+        if (databaseUrl == undefined) {
+            throw new Error("Fatal Error : No mongoDBURL in config.");
+        }
+        _this.database.connect(databaseUrl, { useNewUrlParser: true }, function (err) {
+            console.error("Fatal Error : Could Not Connect to MongoDB.");
+            if (err) {
+                console.error(err.name);
+                console.error(err.message);
+                console.error(err.stack);
+                process.exit(1);
+            }
+        });
         if (token != undefined) {
             _this.token = token;
         }
@@ -112,6 +127,7 @@ var MonodroneBot = /** @class */ (function (_super) {
             this.modules.delete(moduleName);
         }
         this.configLoader.save();
+        this.database.disconnect();
         this.client.destroy()
             .then(console.log)
             .catch(console.error);
