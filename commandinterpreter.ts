@@ -13,7 +13,7 @@ export class CommandInterpreter {
         this.scope = scope;
     }
 
-    interpret() : CommandOutput {
+    async interpret() : Promise<CommandOutput> {
         try {
             let lex : Lexer = new Lexer(this.commandQuery, this.bot.getCommandIndicator());
             let commandNameToken : Token = lex.next();
@@ -39,7 +39,7 @@ export class CommandInterpreter {
                     case TokenType.IMBEDDED_COMMAND:
                         this.scope.push();
                         let interpreter : CommandInterpreter = new CommandInterpreter(this.bot,nextToken.value,this.caller, this.scope);
-                        let commandOutput : CommandOutput = interpreter.interpret();
+                        let commandOutput : CommandOutput = await interpreter.interpret();
                         commandArguments.push(commandOutput);
                         this.scope.pop();
                         break;
@@ -50,7 +50,7 @@ export class CommandInterpreter {
                 }
             }
 
-            return this.bot.runCommand(commandNameToken.value, commandArguments, this.scope, this.caller);
+            return await this.bot.runCommand(commandNameToken.value, commandArguments, this.scope, this.caller);
         } catch(error) {
             if(error instanceof SimpleCommandOutputError) {
                 return error;

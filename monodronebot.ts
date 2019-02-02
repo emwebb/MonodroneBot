@@ -1,4 +1,4 @@
-import {Client, GuildChannel, Message, User, GuildMember} from "discord.js";
+import {Client, GuildChannel, Message, User, GuildMember, Guild, Role} from "discord.js";
 import { CommandInterpreter } from "./commandinterpreter";
 import fs = require("fs");
 import { EventEmitter } from "events";
@@ -17,7 +17,7 @@ export class MonodroneBot extends EventEmitter{
     private client : Client;
     private token : string;
     private commands : Map<string,Command>;
-    private commandIndicator : string = "$";
+    private commandIndicator : string;
     private consoleCaller : ConsoleCaller;
     private scopes : Map<string, ScopeStack>;
     private permissionManager : PermissionManager;
@@ -26,8 +26,6 @@ export class MonodroneBot extends EventEmitter{
     private database : Mongoose;
 
     constructor(token? :string) {
-
-        
         super();
         this.client = new Client();
         this.commands = new Map<string,Command>();
@@ -43,7 +41,8 @@ export class MonodroneBot extends EventEmitter{
 
         let databaseUrl : string | undefined = this.configLoader.get("mongoDBURL");
         if(databaseUrl == undefined) {
-            throw new Error("Fatal Error : No mongoDBURL in config.");
+            this.stop();
+            throw new Error("Fatal Error : No mongoDBURL in config.")
         }  
         
         this.database.connect(databaseUrl, {useNewUrlParser: true}, (err: MongoError) => {
@@ -52,7 +51,8 @@ export class MonodroneBot extends EventEmitter{
                 console.error(err.name);
                 console.error(err.message);
                 console.error(err.stack);
-                process.exit(1);
+                console.error(err.code);
+                this.stop();
             }
         });
         
@@ -70,13 +70,17 @@ export class MonodroneBot extends EventEmitter{
 
         this.client.on("message",(message : Message) => {
             console.log("Recieved message! : " + message.content);
-            if(message.content.startsWith("$")) {
+            if(message.content.startsWith(this.commandIndicator)) {
                 this.consoleCaller.message("Command Recieved : \n" + message.content);
                 let caller = new UserCaller(message,this);
                 let scope = this.getScope("discord:" + message.channel.id);
                 let interpreter = new CommandInterpreter(this,message.content,caller,scope);
-                let output : CommandOutput = interpreter.interpret();
-                message.reply(output.getUserValue());
+                interpreter.interpret().then((output : CommandOutput) => {
+                    message.reply(output.getUserValue());
+                }).catch((reason : any) => {
+                    let error : SimpleCommandOutputError = new SimpleCommandOutputError("There was an error while trying to run the command '" + JSON.stringify(reason) + "'","Error : There was an error while trying to run the command '" + JSON.stringify(reason) + "'");
+                    message.reply(error);
+                });
             }
             
         });
@@ -117,12 +121,12 @@ export class MonodroneBot extends EventEmitter{
         }
     }
 
-    public runCommand(name : string, commandArguments : CommandObject[], scope : ScopeStack, caller : CommandCaller ) : CommandOutput {
+    public async runCommand(name : string, commandArguments : CommandObject[], scope : ScopeStack, caller : CommandCaller ) : Promise<CommandOutput> {
         try {
             if(this.commands.has(name)) {
                 let command : Command = this.commands.get(name)!;
                 if(caller.hasPermission(command.getRequiredPermission())){
-                    return command.call(commandArguments, scope, caller, this);
+                    return await command.call(commandArguments, scope, caller, this);
                 } else {
                     return new SimpleCommandOutputError("Do not have permission", "Error :  You do not have permission " + command.getRequiredPermission() + " which is required to run this command.");
                 }
@@ -184,6 +188,40 @@ export class MonodroneBot extends EventEmitter{
 
     public getDatabase() : Mongoose {
         return this.database;
+    }
+
+    public async getUserFromString(userString: string, guild : Guild) : Promise<User|undefined> {
+        let userMentionRegex = /<@\![0-9]*>/g;
+        if(userMentionRegex.test(userString)) {
+            let userId = userString.substring(3,userString.length - 1);
+            let user = await this.client.fetchUser(userId);
+            return Promise.resolve(user);
+        }
+
+        let member = guild.members.find(user => 
+            user.displayName == userString ||
+            user.id == userString ||
+            user.user.tag == userString ||
+            "@" + user.user.tag == userString);
+        if(member == undefined){
+            return Promise.resolve(undefined);
+        }
+        
+        return Promise.resolve(member.user);
+    }
+
+    public async getRoleFromString(roleString : string, guild : Guild) : Promise<Role|undefined> {
+        let roleMentionableRegex = /<@\&[0-9]*>/g;
+        if(roleMentionableRegex.test(roleString)) {
+            let roleId = roleString.substring(3,roleString.length - 1);
+            let user = guild.roles.get(roleId);
+            return Promise.resolve(user);
+        }
+
+        let role = guild.roles.find(role =>
+            role.name == roleString ||
+            "@" + role.name == roleString);
+        return Promise.resolve(role);
     }
 }
 
@@ -525,7 +563,7 @@ export interface CommandCaller {
     directMessage(message : string) : Promise<any>;
 }
 
-class ConsoleCaller implements CommandCaller{
+export class ConsoleCaller implements CommandCaller{
     
     bot : MonodroneBot;
 
@@ -576,7 +614,7 @@ class ConsoleCaller implements CommandCaller{
     }
 }
 
-class UserCaller implements CommandCaller {
+export class UserCaller implements CommandCaller {
 
     private initMessage : Message;
     private permissionNode : PermissionNode;
@@ -658,25 +696,79 @@ class PermissionManager {
         config["everyone"] = this.everyonePermission.toJson();
 
         config["userPermission"] = {};
-        for(let permissionKey in this.userPermission.keys()) {
-            config["userPermission"][permissionKey] = this.userPermission.get(permissionKey)!.toJson();
-        }
+        this.userPermission.forEach((value : PermissionNode, key : string, map : Map<string, PermissionNode>) => {
+            config["userPermission"][key] = value.toJson();
+        });
 
         config["discordRolePermission"] = {};
-        for(let permissionKey in this.discordRolePermission.keys()) {
-            config["discordRolePermission"][permissionKey] = this.discordRolePermission.get(permissionKey)!.toJson();
-        }
+        this.discordRolePermission.forEach((value : PermissionNode, key : string, map : Map<string, PermissionNode>) => {
+            config["discordRolePermission"][key] = value.toJson();
+        });
 
         return config;
+    }
+
+    grantPermissionToUser(user : User, permission : string[] | string){
+        if(!this.userPermission.has(user.id)) {
+            this.userPermission.set(user.id, new PermissionNode());
+        }
+        this.userPermission.get(user.id)!.grant(permission);
+    }
+
+    grantPermissionToRole(role : Role, permission : string[] | string){
+        if(!this.discordRolePermission.has(role.id)) {
+            this.discordRolePermission.set(role.id, new PermissionNode());
+        }
+        this.discordRolePermission.get(role.id)!.grant(permission);
+    }
+
+    grantPermissionToEveryone(permission : string[] | string) {
+        this.everyonePermission.grant(permission);
+    }
+
+    removePermissionToUser(user : User, permission : string[] | string){
+        if(!this.userPermission.has(user.id)) {
+            this.userPermission.set(user.id, new PermissionNode());
+        }
+        this.userPermission.get(user.id)!.revoke(permission);
+    }
+
+    removePermissionToRole(role : Role, permission : string[] | string){
+        if(!this.discordRolePermission.has(role.id)) {
+            this.discordRolePermission.set(role.id, new PermissionNode());
+        }
+        this.discordRolePermission.get(role.id)!.revoke(permission);
+    }
+
+    removePermissionToEveryone(permission : string[] | string) {
+        this.everyonePermission.revoke(permission);
+    }
+
+    listPermissionForUser(user : User) : string[] {
+        if(!this.userPermission.has(user.id)) {
+            this.userPermission.set(user.id, new PermissionNode());
+        }
+        return this.userPermission.get(user.id)!.getAllPermissions();
+    }
+
+    listPermissionForRole(role : Role) : string[] {
+        if(!this.discordRolePermission.has(role.id)) {
+            this.discordRolePermission.set(role.id, new PermissionNode());
+        }
+        return this.discordRolePermission.get(role.id)!.getAllPermissions();
+    }
+
+    listPermissionForEveryone() : string[] {
+        return this.everyonePermission.getAllPermissions();
     }
 }
 
 class PermissionNode {
     protected children : Map<string,PermissionNode> = new Map();
 
-    hasPermission(permissionArray : Array<string> | string) {
+    hasPermission(permissionArray : Array<string> | string) : boolean {
 
-        if(permissionArray instanceof String) {
+        if(typeof permissionArray == "string") {
             permissionArray = permissionArray.split(".");
         }
 
@@ -690,7 +782,7 @@ class PermissionNode {
 
         if(this.children.has(permissionArray[0])){
             let newPermissionArray = permissionArray.slice(1,permissionArray.length);
-            this.children.get(permissionArray[0])!.hasPermission(newPermissionArray);
+            return this.children.get(permissionArray[0])!.hasPermission(newPermissionArray);
         }
 
         return false;
@@ -698,32 +790,87 @@ class PermissionNode {
 
     clone() : PermissionNode {
         let clone : PermissionNode = new PermissionNode();
-        for(let key in this.children.keys()) {
-            clone.children.set(key,this.children.get(key)!.clone());
-        }
+        this.children.forEach((value : PermissionNode, key: string, map : Map<String,PermissionNode>) => {
+            clone.children.set(key,value);
+        });
         return clone;
         
     }
     
     static merge(a : PermissionNode, b : PermissionNode) : PermissionNode {
         let c = new PermissionNode();
-        for(let key in a.children.keys()) {
+        a.children.forEach((value : PermissionNode, key: string, map : Map<String,PermissionNode>) => {
             if(b.children.has(key)){
-                c.children.set(key,this.merge(a.children.get(key)!,b.children.get(key)!));
+                c.children.set(key,this.merge(value,b.children.get(key)!));
             } else {
-                c.children.set(key,a.clone());
+                c.children.set(key,value.clone());
             }
-        }
+        });
 
-        for(let key in b.children.keys()) {
+        b.children.forEach((value : PermissionNode, key: string, map : Map<String,PermissionNode>) => {
             if(!c.children.has(key)){
-                c.children.set(key,b.clone());
+                c.children.set(key,value.clone());
             }
-        }
+        });
 
         return c;
     }
     
+    public grant(permissionArray : string[] | string) {
+        if(typeof permissionArray == "string") {
+            permissionArray = permissionArray.split(".");
+        }
+        if(permissionArray.length == 0) {
+            return;
+        }
+        if(permissionArray[0] == "*") {
+            this.children = new Map<string , PermissionNode>();
+            this.children.set("*", new PermissionNode());
+            return;
+        }
+        if(!this.children.has(permissionArray[0])){
+            this.children.set(permissionArray[0], new PermissionNode());
+        }
+        let newPermissionArray = permissionArray.slice(1,permissionArray.length);
+        this.children.get(permissionArray[0])!.grant(newPermissionArray);
+    }
+
+    public revoke(permissionArray : string[] | string) {
+        if(typeof permissionArray == "string") {
+            permissionArray = permissionArray.split(".");
+        }
+        if(permissionArray[0] == "*") {
+            this.children = new Map<string , PermissionNode>();
+            return;
+        }
+        if(!this.children.has(permissionArray[0])){
+            return;
+        }
+        if(permissionArray.length == 1) {
+            this.children.delete(permissionArray[0]);
+        }
+        let newPermissionArray = permissionArray.slice(1,permissionArray.length);
+        this.children.get(permissionArray[0])!.revoke(newPermissionArray);
+    }
+    
+    public getAllPermissions() : string[] {
+        if(this.children.size == 0) {
+            return [];
+        }
+        let permissions : string[] = [];
+        this.children.forEach((value : PermissionNode, key: string, map : Map<String,PermissionNode>) => {
+            let nodePermissions = value.getAllPermissions();
+            if(nodePermissions.length == 0) {
+                permissions.push(key);
+            } else {
+                nodePermissions.forEach(permission => {
+                    permissions.push(key + "." + permission);
+                });
+            }
+        });
+        return permissions;
+    }
+
     static fromJsonString(jsonString : string) : PermissionNode {
         return PermissionNode.fromJson(JSON.parse(jsonString));
     }
@@ -757,7 +904,7 @@ class PermissionNode {
 
 export interface Command {
     getName() : string;
-    call(input : CommandObject[], scope : ScopeStack, caller : CommandCaller, bot : MonodroneBot) : CommandOutput;
+    call(input : CommandObject[], scope : ScopeStack, caller : CommandCaller, bot : MonodroneBot) : Promise<CommandOutput>;
     getRequiredPermission() : string;
     getShortHelpText() : string;
     getLongHelpText() : string;

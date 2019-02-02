@@ -1,11 +1,8 @@
 "use strict";
 var __extends = (this && this.__extends) || (function () {
-    var extendStatics = function (d, b) {
-        extendStatics = Object.setPrototypeOf ||
-            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-        return extendStatics(d, b);
-    };
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
     return function (d, b) {
         extendStatics(d, b);
         function __() { this.constructor = d; }
@@ -27,8 +24,8 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     function step(op) {
         if (f) throw new TypeError("Generator is already executing.");
         while (_) try {
-            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
-            if (y = 0, t) op = [op[0] & 2, t.value];
+            if (f = 1, y && (t = y[op[0] & 2 ? "return" : op[0] ? "throw" : "next"]) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [0, t.value];
             switch (op[0]) {
                 case 0: case 1: t = op; break;
                 case 4: _.label++; return { value: op[1], done: false };
@@ -63,7 +60,6 @@ var MonodroneBot = /** @class */ (function (_super) {
     __extends(MonodroneBot, _super);
     function MonodroneBot(token) {
         var _this = _super.call(this) || this;
-        _this.commandIndicator = "$";
         _this.client = new discord_js_1.Client();
         _this.commands = new Map();
         _this.consoleCaller = new ConsoleCaller(_this);
@@ -75,6 +71,7 @@ var MonodroneBot = /** @class */ (function (_super) {
         _this.database = new mongoose_1.Mongoose();
         var databaseUrl = _this.configLoader.get("mongoDBURL");
         if (databaseUrl == undefined) {
+            _this.stop();
             throw new Error("Fatal Error : No mongoDBURL in config.");
         }
         _this.database.connect(databaseUrl, { useNewUrlParser: true }, function (err) {
@@ -83,7 +80,8 @@ var MonodroneBot = /** @class */ (function (_super) {
                 console.error(err.name);
                 console.error(err.message);
                 console.error(err.stack);
-                process.exit(1);
+                console.error(err.code);
+                _this.stop();
             }
         });
         if (token != undefined) {
@@ -99,13 +97,17 @@ var MonodroneBot = /** @class */ (function (_super) {
         _this.commandIndicator = commandIndicator;
         _this.client.on("message", function (message) {
             console.log("Recieved message! : " + message.content);
-            if (message.content.startsWith("$")) {
+            if (message.content.startsWith(_this.commandIndicator)) {
                 _this.consoleCaller.message("Command Recieved : \n" + message.content);
                 var caller = new UserCaller(message, _this);
                 var scope = _this.getScope("discord:" + message.channel.id);
                 var interpreter = new commandinterpreter_1.CommandInterpreter(_this, message.content, caller, scope);
-                var output = interpreter.interpret();
-                message.reply(output.getUserValue());
+                interpreter.interpret().then(function (output) {
+                    message.reply(output.getUserValue());
+                }).catch(function (reason) {
+                    var error = new SimpleCommandOutputError("There was an error while trying to run the command '" + JSON.stringify(reason) + "'", "Error : There was an error while trying to run the command '" + JSON.stringify(reason) + "'");
+                    message.reply(error);
+                });
             }
         });
         _this.emit("start");
@@ -142,27 +144,32 @@ var MonodroneBot = /** @class */ (function (_super) {
         }
     };
     MonodroneBot.prototype.runCommand = function (name, commandArguments, scope, caller) {
-        try {
-            if (this.commands.has(name)) {
-                var command = this.commands.get(name);
-                if (caller.hasPermission(command.getRequiredPermission())) {
-                    return command.call(commandArguments, scope, caller, this);
+        return __awaiter(this, void 0, void 0, function () {
+            var command, error_1;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        _a.trys.push([0, 6, , 7]);
+                        if (!this.commands.has(name)) return [3 /*break*/, 4];
+                        command = this.commands.get(name);
+                        if (!caller.hasPermission(command.getRequiredPermission())) return [3 /*break*/, 2];
+                        return [4 /*yield*/, command.call(commandArguments, scope, caller, this)];
+                    case 1: return [2 /*return*/, _a.sent()];
+                    case 2: return [2 /*return*/, new SimpleCommandOutputError("Do not have permission", "Error :  You do not have permission " + command.getRequiredPermission() + " which is required to run this command.")];
+                    case 3: return [3 /*break*/, 5];
+                    case 4: return [2 /*return*/, new SimpleCommandOutputError("Command does not exist", "Error :  Command '" + name + "' does not exist!")];
+                    case 5: return [3 /*break*/, 7];
+                    case 6:
+                        error_1 = _a.sent();
+                        console.log(error_1);
+                        if (error_1 instanceof Error) {
+                            return [2 /*return*/, new SimpleCommandOutputError(error_1.name + "\n" + error_1.message + "\n" + error_1.stack, "Error :  Command failed with an error : " + error_1.message)];
+                        }
+                        return [2 /*return*/, new SimpleCommandOutputError(JSON.stringify(error_1), "Error :  Command failed with an error : " + JSON.stringify(error_1))];
+                    case 7: return [2 /*return*/];
                 }
-                else {
-                    return new SimpleCommandOutputError("Do not have permission", "Error :  You do not have permission " + command.getRequiredPermission() + " which is required to run this command.");
-                }
-            }
-            else {
-                return new SimpleCommandOutputError("Command does not exist", "Error :  Command '" + name + "' does not exist!");
-            }
-        }
-        catch (error) {
-            console.log(error);
-            if (error instanceof Error) {
-                return new SimpleCommandOutputError(error.name + "\n" + error.message + "\n" + error.stack, "Error :  Command failed with an error : " + error.message);
-            }
-            return new SimpleCommandOutputError(JSON.stringify(error), "Error :  Command failed with an error : " + JSON.stringify(error));
-        }
+            });
+        });
     };
     MonodroneBot.prototype.registerCommand = function (command) {
         this.commands.set(command.getName(), command);
@@ -200,6 +207,52 @@ var MonodroneBot = /** @class */ (function (_super) {
     };
     MonodroneBot.prototype.getDatabase = function () {
         return this.database;
+    };
+    MonodroneBot.prototype.getUserFromString = function (userString, guild) {
+        return __awaiter(this, void 0, void 0, function () {
+            var userMentionRegex, userId, user, member;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        userMentionRegex = /<@\![0-9]*>/g;
+                        if (!userMentionRegex.test(userString)) return [3 /*break*/, 2];
+                        userId = userString.substring(3, userString.length - 1);
+                        return [4 /*yield*/, this.client.fetchUser(userId)];
+                    case 1:
+                        user = _a.sent();
+                        return [2 /*return*/, Promise.resolve(user)];
+                    case 2:
+                        member = guild.members.find(function (user) {
+                            return user.displayName == userString ||
+                                user.id == userString ||
+                                user.user.tag == userString ||
+                                "@" + user.user.tag == userString;
+                        });
+                        if (member == undefined) {
+                            return [2 /*return*/, Promise.resolve(undefined)];
+                        }
+                        return [2 /*return*/, Promise.resolve(member.user)];
+                }
+            });
+        });
+    };
+    MonodroneBot.prototype.getRoleFromString = function (roleString, guild) {
+        return __awaiter(this, void 0, void 0, function () {
+            var roleMentionableRegex, roleId, user, role;
+            return __generator(this, function (_a) {
+                roleMentionableRegex = /<@\&[0-9]*>/g;
+                if (roleMentionableRegex.test(roleString)) {
+                    roleId = roleString.substring(3, roleString.length - 1);
+                    user = guild.roles.get(roleId);
+                    return [2 /*return*/, Promise.resolve(user)];
+                }
+                role = guild.roles.find(function (role) {
+                    return role.name == roleString ||
+                        "@" + role.name == roleString;
+                });
+                return [2 /*return*/, Promise.resolve(role)];
+            });
+        });
     };
     return MonodroneBot;
 }(events_1.EventEmitter));
@@ -536,6 +589,7 @@ var ConsoleCaller = /** @class */ (function () {
     };
     return ConsoleCaller;
 }());
+exports.ConsoleCaller = ConsoleCaller;
 var UserCaller = /** @class */ (function () {
     function UserCaller(message, bot) {
         this.permissionNode = bot.getPermissionManager().getPermissionsForUser(message.author);
@@ -558,6 +612,7 @@ var UserCaller = /** @class */ (function () {
     };
     return UserCaller;
 }());
+exports.UserCaller = UserCaller;
 var PermissionManager = /** @class */ (function () {
     function PermissionManager() {
         this.userPermission = new Map();
@@ -604,14 +659,59 @@ var PermissionManager = /** @class */ (function () {
         var config = {};
         config["everyone"] = this.everyonePermission.toJson();
         config["userPermission"] = {};
-        for (var permissionKey in this.userPermission.keys()) {
-            config["userPermission"][permissionKey] = this.userPermission.get(permissionKey).toJson();
-        }
+        this.userPermission.forEach(function (value, key, map) {
+            config["userPermission"][key] = value.toJson();
+        });
         config["discordRolePermission"] = {};
-        for (var permissionKey in this.discordRolePermission.keys()) {
-            config["discordRolePermission"][permissionKey] = this.discordRolePermission.get(permissionKey).toJson();
-        }
+        this.discordRolePermission.forEach(function (value, key, map) {
+            config["discordRolePermission"][key] = value.toJson();
+        });
         return config;
+    };
+    PermissionManager.prototype.grantPermissionToUser = function (user, permission) {
+        if (!this.userPermission.has(user.id)) {
+            this.userPermission.set(user.id, new PermissionNode());
+        }
+        this.userPermission.get(user.id).grant(permission);
+    };
+    PermissionManager.prototype.grantPermissionToRole = function (role, permission) {
+        if (!this.discordRolePermission.has(role.id)) {
+            this.discordRolePermission.set(role.id, new PermissionNode());
+        }
+        this.discordRolePermission.get(role.id).grant(permission);
+    };
+    PermissionManager.prototype.grantPermissionToEveryone = function (permission) {
+        this.everyonePermission.grant(permission);
+    };
+    PermissionManager.prototype.removePermissionToUser = function (user, permission) {
+        if (!this.userPermission.has(user.id)) {
+            this.userPermission.set(user.id, new PermissionNode());
+        }
+        this.userPermission.get(user.id).revoke(permission);
+    };
+    PermissionManager.prototype.removePermissionToRole = function (role, permission) {
+        if (!this.discordRolePermission.has(role.id)) {
+            this.discordRolePermission.set(role.id, new PermissionNode());
+        }
+        this.discordRolePermission.get(role.id).revoke(permission);
+    };
+    PermissionManager.prototype.removePermissionToEveryone = function (permission) {
+        this.everyonePermission.revoke(permission);
+    };
+    PermissionManager.prototype.listPermissionForUser = function (user) {
+        if (!this.userPermission.has(user.id)) {
+            this.userPermission.set(user.id, new PermissionNode());
+        }
+        return this.userPermission.get(user.id).getAllPermissions();
+    };
+    PermissionManager.prototype.listPermissionForRole = function (role) {
+        if (!this.discordRolePermission.has(role.id)) {
+            this.discordRolePermission.set(role.id, new PermissionNode());
+        }
+        return this.discordRolePermission.get(role.id).getAllPermissions();
+    };
+    PermissionManager.prototype.listPermissionForEveryone = function () {
+        return this.everyonePermission.getAllPermissions();
     };
     return PermissionManager;
 }());
@@ -620,7 +720,7 @@ var PermissionNode = /** @class */ (function () {
         this.children = new Map();
     }
     PermissionNode.prototype.hasPermission = function (permissionArray) {
-        if (permissionArray instanceof String) {
+        if (typeof permissionArray == "string") {
             permissionArray = permissionArray.split(".");
         }
         if (permissionArray.length == 0) {
@@ -631,33 +731,87 @@ var PermissionNode = /** @class */ (function () {
         }
         if (this.children.has(permissionArray[0])) {
             var newPermissionArray = permissionArray.slice(1, permissionArray.length);
-            this.children.get(permissionArray[0]).hasPermission(newPermissionArray);
+            return this.children.get(permissionArray[0]).hasPermission(newPermissionArray);
         }
         return false;
     };
     PermissionNode.prototype.clone = function () {
         var clone = new PermissionNode();
-        for (var key in this.children.keys()) {
-            clone.children.set(key, this.children.get(key).clone());
-        }
+        this.children.forEach(function (value, key, map) {
+            clone.children.set(key, value);
+        });
         return clone;
     };
     PermissionNode.merge = function (a, b) {
+        var _this = this;
         var c = new PermissionNode();
-        for (var key in a.children.keys()) {
+        a.children.forEach(function (value, key, map) {
             if (b.children.has(key)) {
-                c.children.set(key, this.merge(a.children.get(key), b.children.get(key)));
+                c.children.set(key, _this.merge(value, b.children.get(key)));
             }
             else {
-                c.children.set(key, a.clone());
+                c.children.set(key, value.clone());
             }
-        }
-        for (var key in b.children.keys()) {
+        });
+        b.children.forEach(function (value, key, map) {
             if (!c.children.has(key)) {
-                c.children.set(key, b.clone());
+                c.children.set(key, value.clone());
             }
-        }
+        });
         return c;
+    };
+    PermissionNode.prototype.grant = function (permissionArray) {
+        if (typeof permissionArray == "string") {
+            permissionArray = permissionArray.split(".");
+        }
+        if (permissionArray.length == 0) {
+            return;
+        }
+        if (permissionArray[0] == "*") {
+            this.children = new Map();
+            this.children.set("*", new PermissionNode());
+            return;
+        }
+        if (!this.children.has(permissionArray[0])) {
+            this.children.set(permissionArray[0], new PermissionNode());
+        }
+        var newPermissionArray = permissionArray.slice(1, permissionArray.length);
+        this.children.get(permissionArray[0]).grant(newPermissionArray);
+    };
+    PermissionNode.prototype.revoke = function (permissionArray) {
+        if (typeof permissionArray == "string") {
+            permissionArray = permissionArray.split(".");
+        }
+        if (permissionArray[0] == "*") {
+            this.children = new Map();
+            return;
+        }
+        if (!this.children.has(permissionArray[0])) {
+            return;
+        }
+        if (permissionArray.length == 1) {
+            this.children.delete(permissionArray[0]);
+        }
+        var newPermissionArray = permissionArray.slice(1, permissionArray.length);
+        this.children.get(permissionArray[0]).revoke(newPermissionArray);
+    };
+    PermissionNode.prototype.getAllPermissions = function () {
+        if (this.children.size == 0) {
+            return [];
+        }
+        var permissions = [];
+        this.children.forEach(function (value, key, map) {
+            var nodePermissions = value.getAllPermissions();
+            if (nodePermissions.length == 0) {
+                permissions.push(key);
+            }
+            else {
+                nodePermissions.forEach(function (permission) {
+                    permissions.push(key + "." + permission);
+                });
+            }
+        });
+        return permissions;
     };
     PermissionNode.fromJsonString = function (jsonString) {
         return PermissionNode.fromJson(JSON.parse(jsonString));
