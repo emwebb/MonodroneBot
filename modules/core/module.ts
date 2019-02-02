@@ -1,4 +1,4 @@
-import {Module, MonodroneBot, Command, CommandObject, ScopeStack, CommandCaller, CommandOutput, CommandStringOutput} from "../../monodronebot"
+import {Module, MonodroneBot, Command, CommandObject, ScopeStack, CommandCaller, CommandOutput, CommandStringOutput, SimpleCommandOutputError} from "../../monodronebot"
 
 export default class CoreModule implements Module {
     private bot! : MonodroneBot;
@@ -46,8 +46,6 @@ class PingCommand implements Command{
     getLongHelpText(): string {
         return "Replies Pong! Plus any other argumenst you sent it."
     }
-
-
 }
 
 class HelpCommand implements Command{
@@ -79,8 +77,27 @@ class HelpCommand implements Command{
     getLongHelpText(): string {
         return "Shows a list of commands and descriptions."
     }
-
-
 }
 
+class PermissionHelp implements Command{
+    getName(): string {
+        return "permission";
+    }    
+    call(input: CommandObject[], scope: ScopeStack, caller: CommandCaller, bot : MonodroneBot): CommandOutput {
+        if(input.length < 2) {
+            return new SimpleCommandOutputError("Need atleast 2 arguments", "Error : This command needs atleast 2 argumenst");
+        }
 
+
+        return new CommandStringOutput("");
+    }
+    getRequiredPermission(): string {
+        return "core.permission";
+    }
+    getShortHelpText(): string {
+        return "Grant , Remove or List permissions a role or user has.";
+    }
+    getLongHelpText(): string {
+        return "$permission <grant/remove/list> <username/userid/role name/role id/everyone> [permission name..]";
+    }
+}

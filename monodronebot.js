@@ -79,7 +79,7 @@ var MonodroneBot = /** @class */ (function (_super) {
         }
         _this.database.connect(databaseUrl, { useNewUrlParser: true }, function (err) {
             console.error("Fatal Error : Could Not Connect to MongoDB.");
-            if (err) {
+            if (err.code) {
                 console.error(err.name);
                 console.error(err.message);
                 console.error(err.stack);
@@ -144,7 +144,13 @@ var MonodroneBot = /** @class */ (function (_super) {
     MonodroneBot.prototype.runCommand = function (name, commandArguments, scope, caller) {
         try {
             if (this.commands.has(name)) {
-                return this.commands.get(name).call(commandArguments, scope, caller, this);
+                var command = this.commands.get(name);
+                if (caller.hasPermission(command.getRequiredPermission())) {
+                    return command.call(commandArguments, scope, caller, this);
+                }
+                else {
+                    return new SimpleCommandOutputError("Do not have permission", "Error :  You do not have permission " + command.getRequiredPermission() + " which is required to run this command.");
+                }
             }
             else {
                 return new SimpleCommandOutputError("Command does not exist", "Error :  Command '" + name + "' does not exist!");
@@ -191,6 +197,9 @@ var MonodroneBot = /** @class */ (function (_super) {
     };
     MonodroneBot.prototype.getCommands = function () {
         return this.commands;
+    };
+    MonodroneBot.prototype.getDatabase = function () {
+        return this.database;
     };
     return MonodroneBot;
 }(events_1.EventEmitter));
@@ -656,15 +665,24 @@ var PermissionNode = /** @class */ (function () {
     PermissionNode.fromJson = function (rawJson) {
         var newNode = new PermissionNode();
         for (var key in rawJson) {
+            if (key == ".") {
+                continue;
+            }
             newNode.children.set(key, PermissionNode.fromJson(rawJson[key]));
         }
         return newNode;
     };
     PermissionNode.prototype.toJson = function () {
-        var asJson = {};
-        for (var nodeKey in this.children.keys()) {
-            asJson[nodeKey] = this.children.get(nodeKey).toJson();
+        var asJson = { ".": true };
+        var keys = this.children.keys();
+        console.log(keys);
+        var nodeKey;
+        while (!(nodeKey = keys.next()).done) {
+            console.log(nodeKey);
+            asJson[nodeKey.value] = this.children.get(nodeKey.value).toJson();
         }
+        console.log(asJson);
+        console.log(this.children);
         return asJson;
     };
     return PermissionNode;

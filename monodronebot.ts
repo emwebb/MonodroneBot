@@ -120,7 +120,12 @@ export class MonodroneBot extends EventEmitter{
     public runCommand(name : string, commandArguments : CommandObject[], scope : ScopeStack, caller : CommandCaller ) : CommandOutput {
         try {
             if(this.commands.has(name)) {
-                return this.commands.get(name)!.call(commandArguments, scope, caller, this);
+                let command : Command = this.commands.get(name)!;
+                if(caller.hasPermission(command.getRequiredPermission())){
+                    return command.call(commandArguments, scope, caller, this);
+                } else {
+                    return new SimpleCommandOutputError("Do not have permission", "Error :  You do not have permission " + command.getRequiredPermission() + " which is required to run this command.");
+                }
             } else {
                 return new SimpleCommandOutputError("Command does not exist", "Error :  Command '" + name + "' does not exist!");
             }
@@ -726,16 +731,25 @@ class PermissionNode {
     static fromJson(rawJson : any) : PermissionNode {
         let newNode = new PermissionNode();
         for(let key in rawJson) {
+            if(key == ".") {
+                continue;
+            }
             newNode.children.set(key,PermissionNode.fromJson(rawJson[key]));
         }
         return newNode;
     }
 
     toJson() : any {
-        let asJson : any = {};
-        for(let nodeKey in this.children.keys()) {
-            asJson[nodeKey] = this.children.get(nodeKey)!.toJson();
+        let asJson : any = {".": true};
+        let keys = this.children.keys()
+        console.log(keys);
+        let nodeKey : IteratorResult<string>;
+        while(!(nodeKey = keys.next()).done ) {
+            console.log(nodeKey);
+            asJson[nodeKey.value] = this.children.get(nodeKey.value)!.toJson();
         }
+        console.log(asJson);
+        console.log(this.children);
 
         return asJson;
     }
