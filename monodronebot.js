@@ -360,6 +360,9 @@ var CommandNull = /** @class */ (function () {
 exports.CommandNull = CommandNull;
 var SimpleCommandOutputError = /** @class */ (function () {
     function SimpleCommandOutputError(error, userError) {
+        if (userError == undefined) {
+            userError = "Error : " + error;
+        }
         this.error = new SimpleCommandError(error, userError);
     }
     SimpleCommandOutputError.prototype.hadError = function () {

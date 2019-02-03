@@ -37,6 +37,8 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 Object.defineProperty(exports, "__esModule", { value: true });
 var monodronebot_1 = require("../../monodronebot");
 var discord_js_1 = require("discord.js");
+var timers_1 = require("timers");
+var fs = require("fs");
 var CoreModule = /** @class */ (function () {
     function CoreModule() {
     }
@@ -51,11 +53,15 @@ var CoreModule = /** @class */ (function () {
         this.bot.registerCommand(new PingCommand());
         this.bot.registerCommand(new HelpCommand());
         this.bot.registerCommand(new PermissionCommand());
+        this.bot.registerCommand(new RestartCommand());
+        this.bot.registerCommand(new StopCommand());
     };
     CoreModule.prototype.deregister = function () {
         this.bot.deregisterCommand("ping");
         this.bot.deregisterCommand("help");
         this.bot.deregisterCommand("permission");
+        this.bot.deregisterCommand("restart");
+        this.bot.deregisterCommand("stop");
     };
     CoreModule.prototype.configsSave = function () {
     };
@@ -88,6 +94,65 @@ var PingCommand = /** @class */ (function () {
     };
     return PingCommand;
 }());
+var RestartCommand = /** @class */ (function () {
+    function RestartCommand() {
+    }
+    RestartCommand.prototype.getName = function () {
+        return "restart";
+    };
+    RestartCommand.prototype.call = function (input, scope, caller, bot) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                timers_1.setTimeout(function () {
+                    bot.stop();
+                }, 5000);
+                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Restarting in 5 Seconds.")];
+            });
+        });
+    };
+    RestartCommand.prototype.getRequiredPermission = function () {
+        return "core.restart";
+    };
+    RestartCommand.prototype.getShortHelpText = function () {
+        return "Restarts the bot.";
+    };
+    RestartCommand.prototype.getLongHelpText = function () {
+        return "Restarts the bot in 5 seconds.";
+    };
+    return RestartCommand;
+}());
+var StopCommand = /** @class */ (function () {
+    function StopCommand() {
+    }
+    StopCommand.prototype.getName = function () {
+        return "stop";
+    };
+    StopCommand.prototype.call = function (input, scope, caller, bot) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                timers_1.setTimeout(function () {
+                    fs.readdir(".", function (err, files) {
+                        if (files.find(function (name) { return name == "restart.txt"; }) != undefined) {
+                            fs.unlinkSync("restart.txt");
+                        }
+                    });
+                    bot.stop();
+                }, 5000);
+                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Stoping in 5 Seconds.")];
+            });
+        });
+    };
+    StopCommand.prototype.getRequiredPermission = function () {
+        return "core.stop";
+    };
+    StopCommand.prototype.getShortHelpText = function () {
+        return "Stops the bot.";
+    };
+    StopCommand.prototype.getLongHelpText = function () {
+        return "Stops the bot in 5 seconds.";
+    };
+    return StopCommand;
+}());
 var HelpCommand = /** @class */ (function () {
     function HelpCommand() {
     }
@@ -96,10 +161,22 @@ var HelpCommand = /** @class */ (function () {
     };
     HelpCommand.prototype.call = function (input, scope, caller, bot) {
         return __awaiter(this, void 0, void 0, function () {
-            var iterator, value, helpString, command;
+            var iterator, value, helpString, specificCommandName, specificCommand, command;
             return __generator(this, function (_a) {
                 iterator = bot.getCommands().values();
                 helpString = "";
+                if (input.length >= 1) {
+                    specificCommandName = input[0];
+                    if (specificCommandName.hasStringValue()) {
+                        specificCommand = bot.getCommands().get(specificCommandName.getStringValue());
+                        if (specificCommand == undefined) {
+                            return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("Command does not exist")];
+                        }
+                        else {
+                            return [2 /*return*/, new monodronebot_1.CommandStringOutput(bot.getCommandIndicator() + specificCommand.getName() + " - " + specificCommand.getLongHelpText())];
+                        }
+                    }
+                }
                 while (true) {
                     value = iterator.next();
                     if (value.done) {

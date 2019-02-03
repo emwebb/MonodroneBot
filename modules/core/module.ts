@@ -1,5 +1,7 @@
 import {Module, MonodroneBot, Command, CommandObject, ScopeStack, CommandCaller, CommandOutput, CommandStringOutput, SimpleCommandOutputError, UserCaller} from "../../monodronebot"
 import { User, Role } from "discord.js";
+import { setTimeout } from "timers";
+import * as fs from "fs";
 
 export default class CoreModule implements Module {
     private bot! : MonodroneBot;
@@ -17,12 +19,16 @@ export default class CoreModule implements Module {
         this.bot.registerCommand(new PingCommand());
         this.bot.registerCommand(new HelpCommand());
         this.bot.registerCommand(new PermissionCommand());
+        this.bot.registerCommand(new RestartCommand());
+        this.bot.registerCommand(new StopCommand());
     }
 
     deregister(): void {
         this.bot.deregisterCommand("ping");
         this.bot.deregisterCommand("help");
         this.bot.deregisterCommand("permission");
+        this.bot.deregisterCommand("restart");
+        this.bot.deregisterCommand("stop");
     }
 
     configsSave(): void {
@@ -51,6 +57,53 @@ class PingCommand implements Command{
     }
 }
 
+class RestartCommand implements Command{
+    getName(): string {
+        return "restart";
+    }    
+    async call(input: CommandObject[], scope: ScopeStack, caller: CommandCaller, bot : MonodroneBot): Promise<CommandOutput> {
+        setTimeout(() => {
+            bot.stop();
+        }, 5000);
+        return new CommandStringOutput("Restarting in 5 Seconds.");
+    }
+    getRequiredPermission(): string {
+        return "core.restart";
+    }
+    getShortHelpText(): string {
+        return "Restarts the bot."
+    }
+    getLongHelpText(): string {
+        return "Restarts the bot in 5 seconds."
+    }
+}
+
+class StopCommand implements Command{
+    getName(): string {
+        return "stop";
+    }    
+    async call(input: CommandObject[], scope: ScopeStack, caller: CommandCaller, bot : MonodroneBot): Promise<CommandOutput> {
+        setTimeout(() => {
+            fs.readdir(".", (err : NodeJS.ErrnoException, files: string[]) => {
+                if(files.find(name => name == "restart.txt") != undefined){
+                    fs.unlinkSync("restart.txt");
+                }
+            });
+            bot.stop();
+        }, 5000);
+        return new CommandStringOutput("Stoping in 5 Seconds.");
+    }
+    getRequiredPermission(): string {
+        return "core.stop";
+    }
+    getShortHelpText(): string {
+        return "Stops the bot."
+    }
+    getLongHelpText(): string {
+        return "Stops the bot in 5 seconds."
+    }
+}
+
 class HelpCommand implements Command{
     getName(): string {
         return "help";
@@ -59,6 +112,17 @@ class HelpCommand implements Command{
         let iterator = bot.getCommands().values();
         let value : IteratorResult<Command>;
         let helpString : string = "";
+        if(input.length >= 1) {
+            let specificCommandName = input[0];
+            if(specificCommandName.hasStringValue()) {
+                let specificCommand = bot.getCommands().get(specificCommandName.getStringValue()!);
+                if(specificCommand == undefined ) {
+                    return new SimpleCommandOutputError("Command does not exist");
+                } else {
+                    return new CommandStringOutput(bot.getCommandIndicator() + specificCommand.getName() + " - " + specificCommand.getLongHelpText());
+                }
+            }
+        }
 
         while(true) {
             value = iterator.next();

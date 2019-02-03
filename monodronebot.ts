@@ -359,7 +359,10 @@ export class SimpleCommandOutputError implements CommandOutput {
 
     error : CommandError;
 
-    constructor(error : string, userError : string) {
+    constructor(error : string, userError? : string) {
+        if(userError == undefined) {
+            userError = "Error : " + error;
+        }
         this.error = new SimpleCommandError(error, userError);
     }
 
