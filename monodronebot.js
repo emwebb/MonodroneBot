@@ -49,7 +49,7 @@ var discord_js_1 = require("discord.js");
 var commandinterpreter_1 = require("./commandinterpreter");
 var fs = require("fs");
 var events_1 = require("events");
-var mongoose_1 = require("mongoose");
+var mongodb_1 = require("mongodb");
 var marked = require("marked");
 var TerminalRenderer = require("marked-terminal");
 marked.setOptions({
@@ -68,22 +68,21 @@ var MonodroneBot = /** @class */ (function (_super) {
         _this.modules = new Map();
         _this.configLoader = new ConfigLoader();
         _this.permissionManager.loadFromConfig(_this.configLoader.get("permissions"));
-        _this.database = new mongoose_1.Mongoose();
         var databaseUrl = _this.configLoader.get("mongoDBURL");
         if (databaseUrl == undefined) {
             _this.stop();
             throw new Error("Fatal Error : No mongoDBURL in config.");
         }
-        _this.database.connect(databaseUrl, { useNewUrlParser: true }, function (err) {
-            console.error("Fatal Error : Could Not Connect to MongoDB.");
-            if (err.code) {
-                console.error(err.name);
-                console.error(err.message);
-                console.error(err.stack);
-                console.error(err.code);
-                _this.stop();
-            }
+        mongodb_1.MongoClient.connect(databaseUrl, { useNewUrlParser: true }, function (err, client) {
+            _this.database = client;
         });
+        /*
+        this.database.connect(databaseUrl,{ useNewUrlParser: true }).then((value : Mongoose) => {
+            console.log("Succefully connected to database");
+        }).catch((reason : any) => {
+            throw new Error("Fatal Error : Could not connect to database" + reason);
+        });
+        */
         if (token != undefined) {
             _this.token = token;
         }
@@ -119,17 +118,18 @@ var MonodroneBot = /** @class */ (function (_super) {
             .catch(console.error);
     };
     MonodroneBot.prototype.stop = function () {
+        var _this = this;
         this.emit("stop");
         this.configLoader.set("permissions", this.permissionManager.saveToConfig());
         this.configLoader.set("token", this.token);
         this.configLoader.set("commandIndicator", this.commandIndicator);
-        for (var moduleName in this.modules.keys()) {
-            this.modules.get(moduleName).configsSave();
-            this.modules.get(moduleName).deregister();
-            this.modules.delete(moduleName);
-        }
+        this.modules.forEach(function (module, key, map) {
+            module.configsSave();
+            module.deregister();
+            _this.modules.delete(key);
+        });
         this.configLoader.save();
-        this.database.disconnect();
+        this.database.close();
         this.client.destroy()
             .then(console.log)
             .catch(console.error);

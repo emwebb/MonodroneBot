@@ -3,6 +3,7 @@ import { CommandInterpreter } from "./commandinterpreter";
 import fs = require("fs");
 import { EventEmitter } from "events";
 import {Mongoose, ConnectionOptions} from "mongoose";
+import { MongoClient } from "mongodb";
 import { MongoError } from "mongodb";
 
 let marked = require("marked");
@@ -23,7 +24,7 @@ export class MonodroneBot extends EventEmitter{
     private permissionManager : PermissionManager;
     private modules : Map<string, Module>;
     private configLoader : ConfigLoader;
-    private database : Mongoose;
+    private database! : MongoClient;
 
     constructor(token? :string) {
         super();
@@ -36,25 +37,24 @@ export class MonodroneBot extends EventEmitter{
         this.configLoader = new ConfigLoader();
         
         this.permissionManager.loadFromConfig(this.configLoader.get("permissions"));
-        
-        this.database = new Mongoose();
 
         let databaseUrl : string | undefined = this.configLoader.get("mongoDBURL");
         if(databaseUrl == undefined) {
             this.stop();
             throw new Error("Fatal Error : No mongoDBURL in config.")
-        }  
-        
-        this.database.connect(databaseUrl, {useNewUrlParser: true}, (err: MongoError) => {
-            console.error("Fatal Error : Could Not Connect to MongoDB.");
-            if(err.code) {
-                console.error(err.name);
-                console.error(err.message);
-                console.error(err.stack);
-                console.error(err.code);
-                this.stop();
-            }
+        } 
+
+        MongoClient.connect(databaseUrl,{useNewUrlParser: true},(err : MongoError, client : MongoClient) => {
+            this.database = client;
         });
+
+        /* 
+        this.database.connect(databaseUrl,{ useNewUrlParser: true }).then((value : Mongoose) => {
+            console.log("Succefully connected to database");
+        }).catch((reason : any) => {
+            throw new Error("Fatal Error : Could not connect to database" + reason);
+        });
+        */
         
         if(token != undefined) {
             this.token = token;
@@ -67,6 +67,7 @@ export class MonodroneBot extends EventEmitter{
             commandIndicator = "$";
         }
         this.commandIndicator = commandIndicator;
+        
 
         this.client.on("message",(message : Message) => {
             console.log("Recieved message! : " + message.content);
@@ -98,15 +99,17 @@ export class MonodroneBot extends EventEmitter{
         this.configLoader.set("permissions",this.permissionManager.saveToConfig());
         this.configLoader.set("token",this.token);
         this.configLoader.set("commandIndicator",this.commandIndicator)
-        for(let moduleName in this.modules.keys()) {
-            this.modules.get(moduleName)!.configsSave();
-            this.modules.get(moduleName)!.deregister();
-            this.modules.delete(moduleName);
-        }
+        this.modules.forEach((module: Module, key: string, map: Map<string, Module>) => {
+            module.configsSave();
+            module.deregister();
+            this.modules.delete(key);
+        });
+            
+        
         
         this.configLoader.save();
 
-        this.database.disconnect();
+        this.database.close();
         this.client.destroy()
             .then(console.log)
             .catch(console.error);
@@ -186,7 +189,7 @@ export class MonodroneBot extends EventEmitter{
         return this.commands;
     }
 
-    public getDatabase() : Mongoose {
+    public getDatabase() : MongoClient {
         return this.database;
     }
 
