@@ -12,6 +12,7 @@
         "monodronebot.ts",
         "commandinterpreter.ts",
         "modules/core/module.ts",
+        "modules/control/module.ts",
         "restart.ts"
     ]
 }

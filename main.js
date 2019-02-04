@@ -11,7 +11,9 @@ fs.readdir(".", function (err, files) {
 var token = process.argv[2];
 var bot = new monodronebot_1.MonodroneBot(token);
 var module_1 = require("./modules/core/module");
-var module_2 = require("./modules/characterConnection/module");
+var module_2 = require("./modules/control/module");
+var module_3 = require("./modules/characterConnection/module");
 bot.registerModule(new module_1.default());
 bot.registerModule(new module_2.default());
+bot.registerModule(new module_3.default());
 bot.login();

@@ -352,10 +352,6 @@ export class CommandNull implements CommandObject, CommandObjectWithError {
     getValue() : null {
         return null;
     }
-
- 
-
-
 }
 
 export class SimpleCommandOutputError implements CommandOutput {
