@@ -2,7 +2,7 @@ import {Client, GuildChannel, Message, User, GuildMember, Guild, Role} from "dis
 import { CommandInterpreter } from "./commandinterpreter";
 import fs = require("fs");
 import { EventEmitter } from "events";
-import {Mongoose, ConnectionOptions} from "mongoose";
+import { Mongoose } from "mongoose";
 import { MongoClient } from "mongodb";
 import { MongoError } from "mongodb";
 
@@ -47,14 +47,6 @@ export class MonodroneBot extends EventEmitter{
         MongoClient.connect(databaseUrl,{useNewUrlParser: true},(err : MongoError, client : MongoClient) => {
             this.database = client;
         });
-
-        /* 
-        this.database.connect(databaseUrl,{ useNewUrlParser: true }).then((value : Mongoose) => {
-            console.log("Succefully connected to database");
-        }).catch((reason : any) => {
-            throw new Error("Fatal Error : Could not connect to database" + reason);
-        });
-        */
         
         if(token != undefined) {
             this.token = token;

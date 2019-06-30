@@ -171,23 +171,18 @@ class LinkCharacterCommand implements Command{
                                         reject(err);
                                     } else {
                                         let characterName = characterSheet!.data.values![0][0];
-
-                                        bot.getDatabase().db("MonodroneBot").collection("CharacterLink").insert({
+                                        let characterLink = new CharacterLink({
                                             characterID : characterCode,
                                             spreadsheetID : sheetID,
                                             userID : user.id,
                                             alive : true
-                                        },(err, values) => {
-                                            console.log(err);
-                                            console.log(values);
-                                            if(err == undefined) {
-                                                resolve(new CommandStringOutput('Your character ' + characterName + ' has been linked'));
-                                            } else {
-                                                resolve(new SimpleCommandOutputError(JSON.stringify(err)));
-                                            }
                                         });
-
-                                        
+                                        characterLink.save().then((value) => {
+                                            resolve(new CommandStringOutput('Your character ' + characterName + ' has been linked'));
+                                        },
+                                        (error) => {
+                                            resolve(new SimpleCommandOutputError(JSON.stringify(error)));
+                                        });
                                     }
                                 });
                             }

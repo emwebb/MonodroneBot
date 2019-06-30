@@ -76,3 +76,30 @@ class PrintCommand implements Command{
         return "Prints the inputted arguments directly to the channel rather than simply returning them.";
     }
 }
+
+class SetCommand implements Command{
+    getName(): string {
+        return "set";
+    }    
+    async call(input: CommandObject[], scope: ScopeStack, caller: CommandCaller, bot : MonodroneBot): Promise<CommandOutput> {
+        if(input.length != 2) {
+            return new SimpleCommandOutputError("Set requires 2 arguments.");
+        }
+
+        if(!input[0].hasStringValue()) {
+            return new SimpleCommandOutputError("First argument must have a string value");
+        }
+
+        
+        return new CommandStringOutput("Printed");
+    }
+    getRequiredPermission(): string {
+        return "control.set";
+    }
+    getShortHelpText(): string {
+        return "Sets a scope variable.";
+    }
+    getLongHelpText(): string {
+        return "Sets a scope variable (Note : Scope variables are temporary and are often not secure without proper scope managment). set [name] [value]";
+    }
+}

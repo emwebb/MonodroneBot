@@ -79,13 +79,6 @@ var MonodroneBot = /** @class */ (function (_super) {
         mongodb_1.MongoClient.connect(databaseUrl, { useNewUrlParser: true }, function (err, client) {
             _this.database = client;
         });
-        /*
-        this.database.connect(databaseUrl,{ useNewUrlParser: true }).then((value : Mongoose) => {
-            console.log("Succefully connected to database");
-        }).catch((reason : any) => {
-            throw new Error("Fatal Error : Could not connect to database" + reason);
-        });
-        */
         if (token != undefined) {
             _this.token = token;
         }

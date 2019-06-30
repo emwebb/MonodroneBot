@@ -118,3 +118,33 @@ var PrintCommand = /** @class */ (function () {
     };
     return PrintCommand;
 }());
+var SetCommand = /** @class */ (function () {
+    function SetCommand() {
+    }
+    SetCommand.prototype.getName = function () {
+        return "set";
+    };
+    SetCommand.prototype.call = function (input, scope, caller, bot) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                if (input.length != 2) {
+                    return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("Set requires 2 arguments.")];
+                }
+                if (!input[0].hasStringValue()) {
+                    return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("First argument must have a string value")];
+                }
+                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Printed")];
+            });
+        });
+    };
+    SetCommand.prototype.getRequiredPermission = function () {
+        return "control.set";
+    };
+    SetCommand.prototype.getShortHelpText = function () {
+        return "Sets a scope variable.";
+    };
+    SetCommand.prototype.getLongHelpText = function () {
+        return "Sets a scope variable (Note : Scope variables are temporary and are often not secure without proper scope managment). set [name] [value]";
+    };
+    return SetCommand;
+}());

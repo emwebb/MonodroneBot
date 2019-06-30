@@ -14,8 +14,8 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     function step(op) {
         if (f) throw new TypeError("Generator is already executing.");
         while (_) try {
-            if (f = 1, y && (t = y[op[0] & 2 ? "return" : op[0] ? "throw" : "next"]) && !(t = t.call(y, op[1])).done) return t;
-            if (y = 0, t) op = [0, t.value];
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
             switch (op[0]) {
                 case 0: case 1: t = op; break;
                 case 4: _.label++; return { value: op[1], done: false };
@@ -166,20 +166,16 @@ var LinkCharacterCommand = /** @class */ (function () {
                                         }
                                         else {
                                             var characterName_1 = characterSheet.data.values[0][0];
-                                            bot.getDatabase().db("MonodroneBot").collection("CharacterLink").insert({
+                                            var characterLink = new CharacterLink({
                                                 characterID: characterCode,
                                                 spreadsheetID: sheetID_1,
                                                 userID: user.id,
                                                 alive: true
-                                            }, function (err, values) {
-                                                console.log(err);
-                                                console.log(values);
-                                                if (err == undefined) {
-                                                    resolve(new monodronebot_1.CommandStringOutput('Your character ' + characterName_1 + ' has been linked'));
-                                                }
-                                                else {
-                                                    resolve(new monodronebot_1.SimpleCommandOutputError(JSON.stringify(err)));
-                                                }
+                                            });
+                                            characterLink.save().then(function (value) {
+                                                resolve(new monodronebot_1.CommandStringOutput('Your character ' + characterName_1 + ' has been linked'));
+                                            }, function (error) {
+                                                resolve(new monodronebot_1.SimpleCommandOutputError(JSON.stringify(error)));
                                             });
                                         }
                                     });
