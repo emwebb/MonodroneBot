@@ -1,26 +1,64 @@
 
-head
-    meta(name="viewport" content="width=device-width, initial-scale=1")
-    link(rel="stylesheet" href=href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css")
-    script(src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js")
-    script(src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js")
-    script(src="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js")
-    block head
+html
+    head
+        meta(name="viewport" content="width=device-width, initial-scale=1")
+        link(rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css")
+        link(rel="stylesheet" href="/static/js/bower_components/bootstrap-markdown/css/bootstrap-markdown.min.css")
+        script(src="https://unpkg.com/turndown/dist/turndown.js")
+        script(src="/static/js/bower_components/jquery/dist/jquery.js")
+        script(src="/static/js/bower_components/angular/angular.js")
+        script(src="/static/js/bower_components/angular-route/angular-route.js")
+        script(src="/static/js/bower_components/angular-animate/angular-animate.js")
+        script(src="/static/js/bower_components/angular-touch/angular-touch.js")
+        script(src="/static/js/bower_components/angular-bootstrap/ui-bootstrap.js")
+        script(src="/static/js/bower_components/angular-bootstrap/ui-bootstrap.js")
+        script(src="/static/js/bower_components/bootstrap-3.2/dist/js/bootstrap.js")
+        script(src="/static/js/bower_components/bootstrap-markdown/js/bootstrap-markdown.js")
+        script(src="https://cdn.jsdelivr.net/npm/marked/marked.min.js")
+        script(src="/static/js/app.module.js")
+        script(src="/static/js/app.route.js")
+        script(src="/static/js/services/feature.js")
+        script(src="/static/js/services/effect.js")
+        script(src="/static/js/directives/markdown.directive.js")
+        script(src="/static/js/controllers/feature.js")
+        script(src="/static/js/controllers/featureSearch.js")
+        script(src="/static/js/controllers/effect.js")
+        script(src="/static/js/controllers/effectSearch.js")
+        script(src="/static/js/controllers/navbar.js")
+        script(src="/static/js/models/feature.js")
+        script(src="/static/js/models/effect.js")
+        script(src="/static/js/directives/feature.directive.js")
+        style .nav, .pagination, .carousel, .panel-title a { cursor: pointer; }
+        block head
 
-body
-    div(class="jumbotron text-center" style="margin-bottom:0")
-        h1 MonodroneBot
-        p For the Reading Westmarches
-    nav(class="navbar navbar-expand-sm bg-dark navbar-dark")
-        a(class="navbar-brand" href="/") Home
-        div(class="collapse navbar-collapse")
-            ul(class="navbar-nav")
-                if(username)
-                    li(class="nav-item")
-                        a(class="nav-link" href="/")= username
-                else
-                    li(class="nav-item")
-                        a(class="nav-link" href="/auth/discord")= "Login"
+    body(ng-app="MonodroneBot")
+        div(class="jumbotron text-center" style="margin-bottom:0")
+            h1 MonodroneBot
+            p For the Reading Westmarches
+        nav(class="navbar navbar-default navbar-static" role="navrbar" ng-controller="Navbar")
+            .container-fluid
+                .navbar-header
+                    button(class="navbar-toggle" type="button" ng-click="isCollapsed = !isCollapsed")
+                        span(class="sr-only") Toggle Navigation
+                        span(class="icon-bar")
+                        span(class="icon-bar")
+                        span(class="icon-bar")
+                    a(class="navbar-brand" href="/") Home
+                div(uib-collapse="isCollapsed" class="collapse navbar-collapse bs-js-navbar-collapse" id="navbarMenu")
+                    ul(class="nav navbar-nav")
+                        if(user)
+                            li(uib-dropdown on-toggle="toggled(open)")
+                                a(id="navbarDropdownAccount" uib-dropdown-toggle)= user.username
+                                div(class="dropdown-menu" uib-dropdown-menu aria-labelledby="navbarDropdownAccount")
+                                    a(class="dropdown-item" href="/logout") Logout
+                        else
+                            li
+                                a(href="/login/")= "Login"
+                                
+                        if(user)
+                            if(user.role >= 2)
+                                li
+                                    a(href="/dmtools")= "DM Tools"
             
 
-    block content
+        block content

@@ -1,0 +1,48 @@
+<form ng-submit="vm.save()">
+    <div class="form-group" for="effectName">
+      <label>Name</label>
+        <input
+          type="text"
+          ng-model="vm.effect.name"
+          class="form-control"
+        />
+      </div>
+     
+      <div class="form-group" for="featureType">
+        <label>Type</label>
+        <select ng-model="vm.effect.type">
+          <option value="">--Please Select--</option>
+          <option ng-repeat="type in vm.types" value={{type}}>
+            {{type}}
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group" for="featureAbility">
+        <label>Ability</label>
+        <select ng-model="vm.effect.ability">
+          <option value="">N/A</option>
+          <option ng-repeat="ability in vm.abilities" value={{ability}}>
+            {{ability}}
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group" for="featureBonus">
+        <label>Bonus</label>
+        <input
+          type="number"
+          ng-model="vm.effect.bonus"
+          class="form-control"
+          />
+      </div>
+      <div class="form-group" for="effectConditionDescription">
+        <label>Condition Description</label>
+        <input
+          type="text"
+          ng-model="vm.effect.conditionDescription"
+          class="form-control"
+        />
+      </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>

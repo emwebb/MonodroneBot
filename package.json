@@ -1,0 +1,22 @@
+{
+  "name": "monodronebot_common",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emwebb/MonodroneBot.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/emwebb/MonodroneBot/issues"
+  },
+  "homepage": "https://github.com/emwebb/MonodroneBot#readme",
+  "dependencies": {
+    "mongoose": "^5.6.4"
+  }
+}

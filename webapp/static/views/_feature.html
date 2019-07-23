@@ -1,0 +1,85 @@
+<form ng-submit="vm.save({name : vm.featureName})">
+    <div class="form-group" for="featureName">
+      <label>Name</label>
+        <input
+          type="text"
+          ng-model="vm.feature.name"
+          class="form-control"
+        />
+      </div>
+      <label>Display Name</label>
+        <input
+          type="text"
+          ng-model="vm.feature.displayName"
+          class="form-control"
+        />
+      </div>
+      <div class="form-group" for="featureDescription">
+        <label>Description</label>
+          <textarea
+            markdown-editor
+            ng-model="vm.feature.description"
+          />
+        </div>
+        <div class="form-group" for="featureDisplay">
+          <label>Display</label>
+            <input
+              type="checkbox"
+              ng-model="vm.feature.display"
+              class="form-control"
+            />
+          </div>
+        
+        <div class="form-group" for="featureOptions">
+          <label>Choices</label>
+          <div ng-repeat="feature in vm.feature.options track by $index">
+            <select ng-model="feature">
+              <option value="">--Please Select--</option>
+              <option ng-repeat="featureOption in vm.allFeatures" value="{{featureOption._id}}">{{featureOption.name}}</option> 
+            </select>
+            <button ng-click="vm.removeOption($index)" class="btn btn-danger" type="button">Remove</button>
+          </div>
+          <button ng-click="vm.addOption()" class="btn btn-secondary" type="button">Add Option</button>
+        </div>
+
+        <div class="form-group" for="featureOptionMax">
+            <label>Maximum Number of Choices</label>
+            <input
+              type="number"
+              ng-model="vm.feature.optionMax"
+              class="form-control"
+              />
+        </div>
+
+        <div class="form-group" for="featureLevelUnlock">
+          <label>Level Unlock</label>
+          <select ng-model="vm.feature.levelUnlock">
+            <option value=undefined>N/A</option>
+            <option ng-repeat="level in [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]" value={{level}}>
+              {{level}}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group" for="featureUpgradeOf">
+          <label>Upgrade Of</label>
+          <select ng-model="vm.feature.upgradeOf">
+            <option value=undefined>None</option>
+            <option ng-repeat="featureOption in vm.allFeatures" value="{{featureOption._id}}">{{featureOption.name}}</option> 
+          </select>
+        </div>
+        
+        <div class="form-group" for="featureEffects">
+          <label>Effects</label>
+          <div ng-repeat="effect in vm.feature.effects track by $index">
+            <select ng-model="effect">
+              <option value="">--Please Select--</option>
+              <option ng-repeat="featureEffect in vm.alleffects" value="{{featureEffect._id}}">{{featureEffect.name}}</option> 
+            </select>
+            <button ng-click="vm.removeEffect($index)" class="btn btn-danger" type="button">Remove</button>
+          </div>
+          <button ng-click="vm.addEffect()" class="btn btn-secondary" type="button">Add Option</button>
+        </div>
+
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>

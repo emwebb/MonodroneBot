@@ -1,0 +1,22 @@
+<form ng-submit="vm.submit({name : vm.featureName})">
+    <div class="form-group" for="featureName">
+      <label>Effect Name</label>
+        <input
+          type="text"
+          ng-model="vm.effectName"
+          class="form-control"
+          uib-typeahead="effect for effect in vm.search({name : $viewValue})"
+        />
+      </div>
+    <button type="submit" class="btn btn-primary">Search</button>
+</form>
+<a href="#!/effect/" class="btn btn-primary">Create New</a>
+<uib-accordion template-url="static/js/bower_components/bootstrap-ui/template/accordion/accordion.html">
+  <div uib-accordion-group class="panel-default" heading="{{effect.name}}" ng-repeat="effect in vm.effects" template-url="static/js/bower_components/bootstrap-ui/template/accordion/accordion-group.html">
+    <div>{{effect.type}}</div>
+    <div>{{effect.ability}}</div>
+    <div>{{effect.bonus}}</div>
+    <a href="#!/effect/{{effect._id}}" class="btn btn-primary">Edit</a>
+    <a class="btn btn-danger">Delete</a>
+  </div>
+</uib-accordion>

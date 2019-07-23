@@ -1,7 +1,26 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var mongoose = require("mongoose");
-var UserSchema = new mongoose.Schema({
-    auth0id: { type: String, required: true, unique: true }
+var userSchema = new mongoose.Schema({
+    discordUserId: {
+        type: String,
+        required: true
+    },
+    role: {
+        type: Number,
+        enum: [
+            0,
+            1,
+            2,
+            3
+        ],
+        default: 0,
+        required: true
+    },
+    username: {
+        type: String,
+        required: true
+    }
 });
-exports.default = mongoose.model('User', UserSchema);
+var User = mongoose.model('User', userSchema);
+exports.default = User;

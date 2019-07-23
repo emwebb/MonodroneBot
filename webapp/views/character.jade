@@ -1,0 +1,143 @@
+extends layout
+block head
+    title MonodroneBot - #{character.name}
+
+block content
+    div(class="container")
+        div(class="row mt-3")
+            div(class="col-sm-4")
+                div(class="card")
+                        div(class="card-body")
+                            h1 Name : #{character.name} <br/>
+                            h3 Exp  : #{character.experience} <br/>
+            div(class="col-sm-8")
+                div(class="card")
+                    div(class="card-body").
+                        Alignment : #{character.alignment}
+        div(class="row mt-3")
+            div(class="col-sm-3")
+                div(class="card")
+                    div(class="card-body")
+                        table(class="table")
+                            tbody  
+                                tr
+                                    th(scope="row") Str
+                                    td #{character.str}
+                                    td #{Math.floor((character.str - 10)/2)}
+                                tr
+                                    th(scope="row") Dex
+                                    td #{character.dex}
+                                    td #{Math.floor((character.dex - 10)/2)}
+                                tr
+                                    th(scope="row") Con
+                                    td #{character.con}
+                                    td #{Math.floor((character.con - 10)/2)}
+                                tr
+                                    th(scope="row") Int
+                                    td #{character.int}
+                                    td #{Math.floor((character.int - 10)/2)}
+                                tr
+                                    th(scope="row") Wis
+                                    td #{character.wis}
+                                    td #{Math.floor((character.wis - 10)/2)}
+                                tr
+                                    th(scope="row") Cha
+                                    td #{character.cha}
+                                    td #{Math.floor((character.cha - 10)/2)} 
+            div(class="col-sm-3")
+                div(class="card")
+                    div(class="card-body")
+                        table(class="table")
+                            tbody  
+                                tr
+                                    th(scope="row") Inspiration
+                                    td X
+                div(class="card mt-3")
+                    div(class="card-body")
+                        table(class="table")
+                            tbody  
+                                tr
+                                    th(scope="row") Passive Perception
+                                    td 10 
+                                tr
+                                    th(scope="row") Passive Insight
+                                    td 10
+                                tr
+                                    th(scope="row") Passive Investigation
+                                    td 10
+                div(class="card mt-3")
+                    div(class="card-body")
+                        table(class="table")
+                            tbody  
+                                tr
+                                    th(scope="row") Acrobatics
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Animal Handling
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Arcana
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Athletics
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Deception
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") History
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Insight
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Intimidation
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Investigation
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Medicine
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Nature
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Perception
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Performance
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Persuasion
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Religion
+                                    td P
+                                    td 0
+                                tr
+                                    th(scope="row") Sleight of Hand
+                                    td P
+                                    td 0 
+                                tr
+                                    th(scope="row") Stealth
+                                    td P
+                                    td 0 
+                                tr
+                                    th(scope="row") Survival
+                                    td P
+                                    td 0 

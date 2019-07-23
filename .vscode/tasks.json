@@ -1,0 +1,39 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "typescript",
+            "tsconfig": "bot\\tsconfig.json",
+            "problemMatcher": [
+                "$tsc"
+            ],
+            "label": "buildBot"
+        },
+        {
+            "type": "typescript",
+            "tsconfig": "webapp\\tsconfig.json",
+            "problemMatcher": [
+                "$tsc"
+            ],
+            "label": "buildWebappBackend"
+        },
+        {
+            "type": "typescript",
+            "tsconfig": "webapp\\static\\js\\tsconfig.json",
+            "problemMatcher": [
+                "$tsc"
+            ],
+            "label": "buildWebappFrontend"
+        },
+        {
+            "label" : "buildWebapp",
+            "dependsOn" : [
+                "buildWebappBackend",
+                "buildWebappFrontend"
+            ]
+
+        }
+    ]
+}

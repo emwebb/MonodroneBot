@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+      "module": "none",
+      "target": "ES5"
+    },
+    "files": [
+      "app.module.ts",
+      "app.route.ts",
+      "controllers/feature.ts",
+      "controllers/featureSearch.ts",
+      "controllers/effect.ts",
+      "controllers/effectSearch.ts",
+      "services/feature.ts",
+      "services/effect.ts",
+      "models/feature.ts",
+      "models/effect.ts",
+      "directives/feature.directive.ts",
+      "directives/markdown.directive.ts",
+      "controllers/navbar.ts"
+      ]
+}

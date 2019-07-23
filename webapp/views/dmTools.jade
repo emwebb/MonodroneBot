@@ -1,0 +1,22 @@
+extends layout
+block head
+    title MonodroneBot - DM - Features
+
+block content
+    .container
+        .row.mt-3
+            .col-sm-8
+                div(class="jumbotron" ng-view="")
+                               
+            .col-sm-4
+                div(class="jumbotron")
+                    ul
+                        li
+                            a(href="#!/feature") Create New Feature
+                        li
+                            a(href="#!/featureSearch") Search Features
+                        li
+                            a(href="#!/effect") Create New Effect
+                        li
+                            a(href="#!/effectSearch") Search Effects
+                    

@@ -1,11 +1,33 @@
 import * as mongoose from "mongoose"
 
-export interface IUser extends mongoose.Document{
-    auth0id : string
-}
-
-const UserSchema : mongoose.Schema = new mongoose.Schema({
-    auth0id : {type : String, required : true, unique : true}
+let userSchema = new mongoose.Schema({
+    discordUserId : {
+        type : String,
+        required : true
+    },
+    role : {
+        type : Number,
+        enum : [
+            0,
+            1,
+            2,
+            3
+        ],
+        default : 0,
+        required : true
+    },
+    username : {
+        type : String,
+        required : true
+    }
 });
 
-export default mongoose.model('User',UserSchema);
+export interface IUser extends mongoose.Document{
+    discordUserId : String,
+    role : Number,
+    username : String
+}
+
+let User : mongoose.Model<IUser> = mongoose.model<IUser>('User', userSchema);
+
+export default User;

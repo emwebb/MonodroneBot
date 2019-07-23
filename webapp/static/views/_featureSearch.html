@@ -1,0 +1,20 @@
+<form ng-submit="vm.submit({name : vm.featureName})">
+    <div class="form-group" for="featureName">
+      <label>Feature Name</label>
+        <input
+          type="text"
+          ng-model="vm.featureName"
+          class="form-control"
+          uib-typeahead="feature for feature in vm.search({name : $viewValue})"
+        />
+      </div>
+    <button type="submit" class="btn btn-primary">Search</button>
+</form>
+<a href="#!/feature/" class="btn btn-primary">Create New</a>
+<uib-accordion template-url="static/js/bower_components/bootstrap-ui/template/accordion/accordion.html">
+  <div uib-accordion-group class="panel-default" heading="{{feature.name}}" ng-repeat="feature in vm.features" template-url="static/js/bower_components/bootstrap-ui/template/accordion/accordion-group.html">
+    <div>{{feature.description}}</div>
+    <a href="#!/feature/{{feature._id}}" class="btn btn-primary">Edit</a>
+    <a class="btn btn-danger">Delete</a>
+  </div>
+</uib-accordion>
