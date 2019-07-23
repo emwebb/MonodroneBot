@@ -8,7 +8,10 @@
     "angular-animate": "latest",
     "angular-touch": "latest",
     "jquery": "latest",
-    "bootstrap-3.2" : "latest"
+    "bootstrap-3.2" : "latest",
+    "bootstrap-markdown": "latest",
+    "angular-bootstrap" : "latest",
+    "angular-sanitize": "latest"
   },
   "description": "",
   "main": "",
