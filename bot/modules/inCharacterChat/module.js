@@ -37,6 +37,9 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 Object.defineProperty(exports, "__esModule", { value: true });
 var monodronebot_1 = require("../../monodronebot");
 var discord_js_1 = require("discord.js");
+var inCharacterChannel_1 = require("../../../common/models/inCharacterChannel");
+var userInCharacterName_1 = require("../../../common/models/userInCharacterName");
+var util_1 = require("util");
 var InCharacterChatModule = /** @class */ (function () {
     function InCharacterChatModule() {
     }
@@ -53,33 +56,26 @@ var InCharacterChatModule = /** @class */ (function () {
             if (message.author.bot || message.content.startsWith(bot.getCommandIndicator()) || message.content.startsWith("OC")) {
                 return;
             }
-            var inCharacterChannelCollection = bot.getDatabase().db("MonodroneBot").collection("InCharacterChannel");
-            console.log("Messafe Recieved 2!");
-            inCharacterChannelCollection.findOne({ "channelId": channelId }).then(function (value) {
-                if (value == null) {
-                    return;
-                }
-                if (value.icChannel) {
-                    message.delete();
-                    var discordInCharacterNameCollection = bot.getDatabase().db("MonodroneBot").collection("DiscordInCharacterName");
-                    discordInCharacterNameCollection.findOne({
-                        "discordUserId": message.author.id
-                    }).then(function (inCharacterName) {
-                        if (inCharacterChannelCollection == null) {
-                            message.author.sendMessage("You need to set your IC name in order to talk in this channel. Use the help command to find out how.");
-                            return;
-                        }
-                        var channel = message.channel;
-                        if (channel instanceof discord_js_1.TextChannel) {
-                            channel.fetchWebhooks().then(function (webhooks) {
-                                webhooks.get(value.wbId).sendMessage(message.content, {
-                                    "username": inCharacterName.discordInCharacterName
+            inCharacterChannel_1.default.findOne({
+                discordChannelId: channelId
+            }, function (err, icChannel) {
+                if (!util_1.isNullOrUndefined(icChannel)) {
+                    userInCharacterName_1.default.findOne({
+                        discordUserId: message.author.id
+                    }, function (err, inCharacterName) {
+                        if (!util_1.isNullOrUndefined(inCharacterName)) {
+                            var channel = message.channel;
+                            if (channel instanceof discord_js_1.TextChannel) {
+                                message.delete();
+                                channel.fetchWebhooks().then(function (webhooks) {
+                                    webhooks.get(icChannel.webhookID.valueOf()).sendMessage(message.content, {
+                                        username: inCharacterName.name.valueOf()
+                                    });
                                 });
-                            });
+                            }
                         }
                     });
                 }
-            }, function (reason) {
             });
         });
         bot.registerCommand(new SetICName());
@@ -102,7 +98,7 @@ var RegisterInCharacterChannel = /** @class */ (function () {
     };
     RegisterInCharacterChannel.prototype.call = function (input, scope, caller, bot) {
         return __awaiter(this, void 0, void 0, function () {
-            var channel, channel_, inCharacterChannelCollection, p;
+            var channel, channel_, p;
             return __generator(this, function (_a) {
                 if (input.length != 0) {
                     return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("Command requires 0 arguments")];
@@ -119,39 +115,29 @@ var RegisterInCharacterChannel = /** @class */ (function () {
                 else {
                     return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("Must be called from discord.")];
                 }
-                inCharacterChannelCollection = bot.getDatabase().db("MonodroneBot").collection("InCharacterChannel");
                 p = new Promise(function (resolve, reject) {
-                    var result = inCharacterChannelCollection.find({
-                        "channelId": channel.id
-                    });
-                    result.hasNext().then(function (hasNext) {
-                        if (hasNext) {
-                            result.next().then(function (value) {
-                                if (value["icChannel"]) {
-                                    resolve(new monodronebot_1.CommandStringOutput("This channel is already an IC channel"));
-                                }
-                                else {
-                                    inCharacterChannelCollection.update({
-                                        "channelId": channel.id
-                                    }, {
-                                        "$set": {
-                                            "icChannel": true
-                                        }
-                                    });
-                                    resolve(new monodronebot_1.CommandStringOutput("Registered"));
-                                }
-                            });
+                    inCharacterChannel_1.default.findOne({
+                        discordChannelId: channel.id
+                    }, function (err, icChannel) {
+                        if (!util_1.isNullOrUndefined(icChannel)) {
+                            if (icChannel.isICChannel) {
+                                resolve(new monodronebot_1.CommandStringOutput("This channel is already an IC channel"));
+                            }
+                            else {
+                                icChannel.isICChannel = true;
+                                icChannel.save();
+                                resolve(new monodronebot_1.CommandStringOutput("Registered"));
+                            }
                         }
                         else {
                             channel.createWebhook("IC Chat", "").then(function (wb) {
-                                inCharacterChannelCollection.insert({
-                                    "wbId": wb.id,
-                                    "wbToken": wb.token,
-                                    "icChannel": true,
-                                    "channelId": channel.id
-                                }).then(function (value) {
-                                    resolve(new monodronebot_1.CommandStringOutput("Registered"));
-                                });
+                                icChannel = new inCharacterChannel_1.default();
+                                icChannel.discordChannelId = channel.id;
+                                icChannel.isICChannel = true;
+                                icChannel.webhookID = wb.id;
+                                icChannel.webhookToken = wb.token;
+                                icChannel.save();
+                                resolve(new monodronebot_1.CommandStringOutput("Registered"));
                             });
                         }
                     });
@@ -179,7 +165,7 @@ var SetICName = /** @class */ (function () {
     };
     SetICName.prototype.call = function (input, scope, caller, bot) {
         return __awaiter(this, void 0, void 0, function () {
-            var user, guild, characterName, discordInCharacterNameCollection;
+            var user, guild, characterName, icName;
             return __generator(this, function (_a) {
                 if (input.length != 1) {
                     return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("Command requires 1 argument")];
@@ -194,17 +180,10 @@ var SetICName = /** @class */ (function () {
                     return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("Must be called from discord.")];
                 }
                 characterName = input[0].getStringValue();
-                discordInCharacterNameCollection = bot.getDatabase().db("MonodroneBot").collection("DiscordInCharacterName");
-                discordInCharacterNameCollection.updateOne({
-                    "discordUserId": user.id
-                }, {
-                    "$set": {
-                        "discordUserId": user.id,
-                        "discordInCharacterName": input[0].getStringValue()
-                    }
-                }, {
-                    "upsert": true
-                });
+                icName = new userInCharacterName_1.default();
+                icName.discordUserId = user.id;
+                icName.name = characterName;
+                icName.save();
                 return [2 /*return*/, new monodronebot_1.CommandStringOutput("Success")];
             });
         });

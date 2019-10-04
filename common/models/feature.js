@@ -20,19 +20,27 @@ var featureSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Feature'
     },
+    optionTitle: String,
     options: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Feature'
         }],
-    optionMax: Number,
+    optionMax: mongoose.Schema.Types.Mixed,
     effects: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: effect_1.default.modelName
         }],
+    effectsAtLevel: [[{
+                type: mongoose.Schema.Types.ObjectId,
+                ref: effect_1.default.modelName
+            }]],
     display: {
         type: Boolean,
         required: true
     },
+    usage: mongoose.Schema.Types.Mixed,
+    recovery: mongoose.Schema.Types.Mixed,
+    action: String
 });
 var Feature = mongoose.model('Feature', featureSchema);
 exports.default = Feature;

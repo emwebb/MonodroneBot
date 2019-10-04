@@ -2,8 +2,7 @@ import {Client, GuildChannel, Message, User, GuildMember, Guild, Role} from "dis
 import { CommandInterpreter } from "./commandinterpreter";
 import fs = require("fs");
 import { EventEmitter } from "events";
-import { Mongoose } from "mongoose";
-import { MongoClient } from "mongodb";
+import * as mongoose from "mongoose";
 import { MongoError } from "mongodb";
 
 let marked = require("marked");
@@ -24,7 +23,6 @@ export class MonodroneBot extends EventEmitter{
     private permissionManager : PermissionManager;
     private modules : Map<string, Module>;
     private configLoader : ConfigLoader;
-    private database! : MongoClient;
 
     constructor(token? :string) {
         super();
@@ -44,8 +42,12 @@ export class MonodroneBot extends EventEmitter{
             throw new Error("Fatal Error : No mongoDBURL in config.")
         } 
 
-        MongoClient.connect(databaseUrl,{useNewUrlParser: true},(err : MongoError, client : MongoClient) => {
-            this.database = client;
+        mongoose.connect(databaseUrl,{useNewUrlParser: true}, (err : MongoError) => {
+            if(err) {
+                console.error(err);
+            } else {
+                console.log("Connected to database");
+            }
         });
         
         if(token != undefined) {
@@ -101,7 +103,7 @@ export class MonodroneBot extends EventEmitter{
         
         this.configLoader.save();
 
-        this.database.close();
+        mongoose.connection.close();
         this.client.destroy()
             .then(console.log)
             .catch(console.error);
@@ -179,10 +181,6 @@ export class MonodroneBot extends EventEmitter{
 
     public getCommands() : Map<string,Command> {
         return this.commands;
-    }
-
-    public getDatabase() : MongoClient {
-        return this.database;
     }
 
     public async getUserFromString(userString: string, guild : Guild) : Promise<User|undefined> {
@@ -495,6 +493,10 @@ class Scope {
         }
 
     }
+
+    set(key : string, value : CommandObject) {
+        this.scopeMap.set(key,value);
+    }
 }
 
 export class ScopeStack {
@@ -527,6 +529,17 @@ export class ScopeStack {
         }
 
         return false;
+    }
+
+    setValue(name : string, value : CommandObject, down? : number) {
+        if(down == null) {
+            down = 0;
+        }
+
+        let n = this.scopes.length - 1 - down;
+
+        this.scopes[n].set(name, value);
+
     }
 
     pop() : Scope | null{

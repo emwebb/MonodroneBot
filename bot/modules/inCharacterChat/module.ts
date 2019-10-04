@@ -11,6 +11,9 @@ import { Gaxios } from "gaxios";
 import { Document, Schema, Model, model } from "mongoose";
 import { analytics } from "googleapis/build/src/apis/analytics";
 import { Server } from "net";
+import InCharacterChannel, { IInCharacterChannel } from "../../../common/models/inCharacterChannel";
+import UserInCharacterName, { IUserInCharacterName } from "../../../common/models/userInCharacterName";
+import { isNullOrUndefined } from "util";
 
 
 
@@ -32,36 +35,29 @@ export default class InCharacterChatModule implements Module {
             if(message.author.bot || message.content.startsWith(bot.getCommandIndicator()) || message.content.startsWith("OC")) {
                 return
             }
-            let inCharacterChannelCollection = bot.getDatabase().db("MonodroneBot").collection("InCharacterChannel");
-            inCharacterChannelCollection.findOne({"channelId" : channelId}).then((value) => {
-                if(value == null) {
-                    return;
-                }
-                if(value.icChannel) {
-                    message.delete()
-                    let discordInCharacterNameCollection = bot.getDatabase().db("MonodroneBot").collection("DiscordInCharacterName");
-                    discordInCharacterNameCollection.findOne({
-                        "discordUserId" : message.author.id
-                    }).then((inCharacterName) => {
-                        if(inCharacterChannelCollection == null) {
-                            message.author.sendMessage("You need to set your IC name in order to talk in this channel. Use the help command to find out how.");
-                            return;
-                        }
-                        let channel = message.channel;
-                        if(channel instanceof TextChannel) {
-                            channel.fetchWebhooks().then((webhooks) => {
-                                webhooks.get(value.wbId)!.sendMessage(message.content, {
-                                    "username" : inCharacterName.discordInCharacterName
+            InCharacterChannel.findOne({
+                discordChannelId : channelId
+            }, (err, icChannel) => {
+                if(!isNullOrUndefined(icChannel)) {
+                    UserInCharacterName.findOne({
+                        discordUserId : message.author.id
+                    }, (err, inCharacterName) => {
+                        if(!isNullOrUndefined(inCharacterName)) {
+                            let channel = message.channel;
+                            if(channel instanceof TextChannel) {
+                                message.delete();
+                                channel.fetchWebhooks().then((webhooks) => {
+                                    webhooks.get(icChannel.webhookID.valueOf())!.sendMessage(message.content,
+                                        {
+                                            username : inCharacterName.name.valueOf()
+                                        })
                                 });
-                            });
+                            }
                         }
                     });
-                    
                 }
-            },
-            (reason) => {
-
             });
+
         });
         bot.registerCommand(new SetICName());
         bot.registerCommand(new RegisterInCharacterChannel())
@@ -100,49 +96,36 @@ class RegisterInCharacterChannel implements Command{
             return new SimpleCommandOutputError("Must be called from discord.");
         }
         
-        let inCharacterChannelCollection = bot.getDatabase().db("MonodroneBot").collection("InCharacterChannel");
         
         let p : Promise<CommandOutput> = new Promise<CommandOutput>((resolve,reject) => {
-            let result = inCharacterChannelCollection.find(
+            InCharacterChannel.findOne(
                 {
-                    "channelId" : channel.id
-                }
-            )
-            result.hasNext().then((hasNext : boolean) => {
-                if(hasNext) {
-                    result.next().then((value) => {
-                        if(value["icChannel"]) {
+                    discordChannelId : channel.id
+                },
+                (err , icChannel) => {
+                    if(!isNullOrUndefined(icChannel)){
+                        if(icChannel.isICChannel) {
                             resolve(new CommandStringOutput("This channel is already an IC channel"))
                         } else {
-                            inCharacterChannelCollection.update({
-                                "channelId" : channel.id
-                            },
-                            {
-                                "$set" : {
-                                    "icChannel" : true
-                                }
-                            })
+                            icChannel.isICChannel = true;
+                            icChannel.save();
                             resolve(new CommandStringOutput("Registered"))
-                        
                         }
-                    })
-                } else {
-                    channel.createWebhook("IC Chat", "").then((wb : Webhook) => {
-                        inCharacterChannelCollection.insert({
-                            "wbId" : wb.id,
-                            "wbToken" : wb.token,
-                            "icChannel" : true,
-                            "channelId" : channel.id
-                        }).then((value) => {
+                    } else {
+                        
+                        channel.createWebhook("IC Chat", "").then((wb : Webhook) => {
+                            icChannel = new InCharacterChannel();
+                            icChannel.discordChannelId = channel.id;
+                            icChannel.isICChannel = true;
+                            icChannel.webhookID = wb.id;
+                            icChannel.webhookToken = wb.token;
+                            icChannel.save();
                             resolve(new CommandStringOutput("Registered"))
                         });
-
-                    });
-
-                }
-            });
+                    }
+                });
         });
-
+            
         return p;
     }
     getRequiredPermission(): string {
@@ -179,21 +162,10 @@ class SetICName implements Command{
         }
 
         let characterName = input[0].getStringValue()!;
-        let discordInCharacterNameCollection = bot.getDatabase().db("MonodroneBot").collection("DiscordInCharacterName");
-        discordInCharacterNameCollection.updateOne({
-            "discordUserId" : user.id
-            },
-            {
-                "$set" : {
-                    "discordUserId" : user.id,
-                    "discordInCharacterName" : input[0].getStringValue()
-                }
-            },
-            {
-                "upsert" : true
-            }
-        );
-
+        let icName = new UserInCharacterName();
+        icName.discordUserId = user.id;
+        icName.name = characterName;
+        icName.save();
         
 
         return new CommandStringOutput("Success");

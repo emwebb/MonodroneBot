@@ -17,6 +17,10 @@
   },
   "homepage": "https://github.com/emwebb/MonodroneBot#readme",
   "dependencies": {
+    "@types/mongoose": "^5.5.17",
     "mongoose": "^5.6.4"
+  },
+  "devDependencies": {
+    "@types/node": "^12.7.5"
   }
 }

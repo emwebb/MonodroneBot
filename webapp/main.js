@@ -13,6 +13,7 @@ var fs = require("fs");
 var character_1 = require("../common/models/character");
 var api_1 = require("./api/api");
 var authorize_1 = require("./authorize");
+var https = require("https");
 var configString = fs.readFileSync("config.json", { "encoding": "utf8" });
 var config = JSON.parse(configString);
 mongoose.connect("mongodb://localhost:27017/MonodroneBot", {
@@ -120,4 +121,22 @@ app.use("/uib", express.static("static/js/bower_components/bootstrap-ui"));
 app.get("*", function (req, res) {
     res.render("404");
 });
-app.listen(80);
+if (config['cert']) {
+    var privateKey = fs.readFileSync(config['cert']['privateKey'], 'utf8');
+    var certificate = fs.readFileSync(config['cert']['certificate'], 'utf8');
+    var ca = fs.readFileSync(config['cert']['ca'], 'utf8');
+    var credentials = {
+        key: privateKey,
+        cert: certificate,
+        ca: ca
+    };
+    var server = https.createServer(credentials, app);
+    server.listen(443, function () {
+        console.log("Server running on port 443!");
+    });
+}
+else {
+    app.listen(80, function () {
+        console.log("Server running on port 80! DANGEROUS!");
+    });
+}

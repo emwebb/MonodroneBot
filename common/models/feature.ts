@@ -19,19 +19,27 @@ let featureSchema = new mongoose.Schema({
         type : mongoose.Schema.Types.ObjectId,
         ref : 'Feature'
     },
+    optionTitle : String,
     options : [{
         type : mongoose.Schema.Types.ObjectId,
         ref : 'Feature'
     }],
-    optionMax : Number,
+    optionMax : mongoose.Schema.Types.Mixed,
     effects : [{
         type : mongoose.Schema.Types.ObjectId,
         ref : Effect.modelName
     }],
+    effectsAtLevel : [[{
+        type : mongoose.Schema.Types.ObjectId,
+        ref : Effect.modelName
+    }]],
     display : {
         type : Boolean,
         required : true
     },
+    usage : mongoose.Schema.Types.Mixed,
+    recovery : mongoose.Schema.Types.Mixed,
+    action : String
 });
 
 export interface IFeature extends mongoose.Document{
@@ -40,10 +48,15 @@ export interface IFeature extends mongoose.Document{
     levelUnlock? : Number,
     description : String,
     upgradeOf? : IFeature | mongoose.Schema.Types.ObjectId,
+    optionTitle? : String,
     options : IFeature[] | mongoose.Schema.Types.ObjectId[],
-    optionMax? : Number,
+    optionMax? : Number | Number[],
     effects : IEffect[] | mongoose.Schema.Types.ObjectId[],
-    display : Boolean
+    effectsAtLevel : IEffect[][] | mongoose.Schema.Types.ObjectId[][],
+    display : Boolean,
+    usage? : Number[] | Number | String,
+    recovery? : String[] | String,
+    action? : String;
 }
 
 let Feature : mongoose.Model<IFeature> = mongoose.model<IFeature>('Feature', featureSchema);

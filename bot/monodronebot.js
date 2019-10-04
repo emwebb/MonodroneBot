@@ -52,7 +52,7 @@ var discord_js_1 = require("discord.js");
 var commandinterpreter_1 = require("./commandinterpreter");
 var fs = require("fs");
 var events_1 = require("events");
-var mongodb_1 = require("mongodb");
+var mongoose = require("mongoose");
 var marked = require("marked");
 var TerminalRenderer = require("marked-terminal");
 marked.setOptions({
@@ -76,8 +76,13 @@ var MonodroneBot = /** @class */ (function (_super) {
             _this.stop();
             throw new Error("Fatal Error : No mongoDBURL in config.");
         }
-        mongodb_1.MongoClient.connect(databaseUrl, { useNewUrlParser: true }, function (err, client) {
-            _this.database = client;
+        mongoose.connect(databaseUrl, { useNewUrlParser: true }, function (err) {
+            if (err) {
+                console.error(err);
+            }
+            else {
+                console.log("Connected to database");
+            }
         });
         if (token != undefined) {
             _this.token = token;
@@ -125,7 +130,7 @@ var MonodroneBot = /** @class */ (function (_super) {
             _this.modules.delete(key);
         });
         this.configLoader.save();
-        this.database.close();
+        mongoose.connection.close();
         this.client.destroy()
             .then(console.log)
             .catch(console.error);
@@ -200,9 +205,6 @@ var MonodroneBot = /** @class */ (function (_super) {
     };
     MonodroneBot.prototype.getCommands = function () {
         return this.commands;
-    };
-    MonodroneBot.prototype.getDatabase = function () {
-        return this.database;
     };
     MonodroneBot.prototype.getUserFromString = function (userString, guild) {
         return __awaiter(this, void 0, void 0, function () {

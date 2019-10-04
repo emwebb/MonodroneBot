@@ -19,6 +19,10 @@
     "marked": "^0.7.0",
     "marked-terminal": "^3.1.1",
     "mongoose": "^5.4.8",
+    "tokenizr": "^1.5.4",
     "unescape-js": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/tokenizr": "^1.5.1"
   }
 }

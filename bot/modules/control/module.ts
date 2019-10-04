@@ -18,11 +18,13 @@ export default class ControlModule implements Module {
         this.bot = bot;
         this.bot.registerCommand(new PrintCommand());
         this.bot.registerCommand(new EchoCommand());
+        this.bot.registerCommand(new SetCommand());
     }
 
     deregister(): void {
         this.bot.deregisterCommand("print");
         this.bot.deregisterCommand("echo");
+        this.bot.deregisterCommand("set");
     }
 
     configsSave(): void {
@@ -90,8 +92,9 @@ class SetCommand implements Command{
             return new SimpleCommandOutputError("First argument must have a string value");
         }
 
-        
-        return new CommandStringOutput("Printed");
+        scope.setValue(input[0].getStringValue()!, input[1]);
+
+        return new CommandStringOutput("Set");
     }
     getRequiredPermission(): string {
         return "control.set";
