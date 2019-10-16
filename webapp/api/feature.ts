@@ -7,16 +7,7 @@ import consts from "../../common/const";
 let featureRouter = Router();
 
 featureRouter.post("/",authorize(consts.roles.executive,true), (req,res) => {
-    let feature = new Feature();
-    feature.name = req.body["name"];
-    feature.displayName = req.body["displayName"];
-    feature.description = req.body["description"];
-    feature.display = req.body["display"];
-    feature.levelUnlock = req.body["levelUnlock"];
-    feature.upgradeOf = req.body["upgradeOf"];
-    feature.options = req.body["options"];
-    feature.optionMax = req.body["optionMax"];
-    feature.effects = req.body["effects"];
+    let feature = new Feature(req.body);
     if (feature.validateSync()) {
         res.sendStatus(400);
     }
@@ -63,15 +54,7 @@ featureRouter.put("/:featureId",authorize(consts.roles.default,true),(req,res) =
             });
         }
 
-        feature.name = req.body["name"];
-        feature.displayName = req.body["displayName"];
-        feature.description = req.body["description"];
-        feature.display = req.body["display"];
-        feature.levelUnlock = req.body["levelUnlock"];
-        feature.upgradeOf = req.body["upgradeOf"];
-        feature.options = req.body["options"];
-        feature.optionMax = req.body["optionMax"];
-        feature.effects = req.body["effects"];
+        feature.set(req.body);
 
         if(feature.validateSync()) {
             res.sendStatus(400);
@@ -110,10 +93,13 @@ featureRouter.delete("/:featureId",authorize(consts.roles.default,true),(req,res
 
 featureRouter.get("/",authorize(consts.roles.default,true),(req,res) => {
     let query = Feature.find()
+    let pageSize = req.query.pageSize || 20;
+    let page = req.query.page || 0;
+    
     if(req.query.name) {
-        query.where('name',{ $regex : req.query.name , $options : "i"})
+        query = query.where('name',{ $regex : req.query.name , $options : "i"})
     }
-
+    query = query.skip(page*pageSize).limit(pageSize);
     query.then((values) => {
         res.json(values);
 

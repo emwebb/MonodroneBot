@@ -393,6 +393,55 @@ var SimpleCommandOutputError = /** @class */ (function () {
     return SimpleCommandOutputError;
 }());
 exports.SimpleCommandOutputError = SimpleCommandOutputError;
+var CommandObjectArray = /** @class */ (function () {
+    function CommandObjectArray(values) {
+        this.arrayValues = values;
+    }
+    CommandObjectArray.prototype.hasNumberValue = function () {
+        return true;
+    };
+    CommandObjectArray.prototype.getNumberValue = function () {
+        return this.arrayValues.length;
+    };
+    CommandObjectArray.prototype.hasStringValue = function () {
+        return this.arrayValues.map(function (value) { return value.hasStringValue(); }).reduce(function (pre, cur) { return pre && cur; });
+    };
+    CommandObjectArray.prototype.getStringValue = function () {
+        if (this.hasStringValue) {
+            return this.arrayValues.map(function (value) { return value.getStringValue(); }).join("\n");
+        }
+        else {
+            return null;
+        }
+    };
+    CommandObjectArray.prototype.getUserValue = function () {
+        return this.arrayValues.map(function (value) { return value.getUserValue(); }).join("\n");
+    };
+    CommandObjectArray.prototype.getValueType = function () {
+        return "Array";
+    };
+    CommandObjectArray.prototype.getValue = function () {
+        return this.arrayValues;
+    };
+    return CommandObjectArray;
+}());
+exports.CommandObjectArray = CommandObjectArray;
+var CommandOutputArray = /** @class */ (function (_super) {
+    __extends(CommandOutputArray, _super);
+    function CommandOutputArray(values, error) {
+        var _this = _super.call(this, values) || this;
+        _this.error = error;
+        return _this;
+    }
+    CommandOutputArray.prototype.hadError = function () {
+        return this.error != undefined;
+    };
+    CommandOutputArray.prototype.getError = function () {
+        return this.error;
+    };
+    return CommandOutputArray;
+}(CommandObjectArray));
+exports.CommandOutputArray = CommandOutputArray;
 var CommandString = /** @class */ (function () {
     function CommandString(value) {
         this.value = value;
@@ -481,6 +530,9 @@ var Scope = /** @class */ (function () {
             return value;
         }
     };
+    Scope.prototype.set = function (key, value) {
+        this.scopeMap.set(key, value);
+    };
     return Scope;
 }());
 var ScopeStack = /** @class */ (function () {
@@ -510,6 +562,13 @@ var ScopeStack = /** @class */ (function () {
             }
         }
         return false;
+    };
+    ScopeStack.prototype.setValue = function (name, value, down) {
+        if (down == null) {
+            down = 0;
+        }
+        var n = this.scopes.length - 1 - down;
+        this.scopes[n].set(name, value);
     };
     ScopeStack.prototype.pop = function () {
         if (this.scopes.length > 1) {

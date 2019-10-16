@@ -7,12 +7,7 @@ var mongoose = require("mongoose");
 var const_1 = require("../../common/const");
 var effectRouter = express_1.Router();
 effectRouter.post("/", authorize_1.authorize(const_1.default.roles.executive, true), function (req, res) {
-    var effect = new effect_1.default();
-    effect.name = req.body["name"];
-    effect.type = req.body["type"];
-    effect.ability = req.body["ability"];
-    effect.bonus = req.body["bonus"];
-    effect.conditionDescription = req.body["conditionDescription"];
+    var effect = new effect_1.default(req.body);
     var error = effect.validateSync();
     if (error) {
         res.sendStatus(400);
@@ -56,11 +51,7 @@ effectRouter.put("/:effectId", authorize_1.authorize(const_1.default.roles.defau
                 _id: effectId
             });
         }
-        effect.name = req.body["name"];
-        effect.type = req.body["type"];
-        effect.ability = req.body["ability"];
-        effect.bonus = req.body["bonus"];
-        effect.conditionDescription = req.body["conditionDescription"];
+        effect.set(req.body);
         var error = effect.validateSync();
         if (error) {
             res.sendStatus(400);
@@ -90,9 +81,12 @@ effectRouter.delete("/:effectId", authorize_1.authorize(const_1.default.roles.de
 });
 effectRouter.get("/", authorize_1.authorize(const_1.default.roles.default, true), function (req, res) {
     var query = effect_1.default.find();
+    var pageSize = req.query.pageSize || 20;
+    var page = req.query.page || 0;
     if (req.query.name) {
-        query.where('name', { $regex: req.query.name, $options: "i" });
+        query = query.where('name', { $regex: req.query.name, $options: "i" });
     }
+    query = query.skip(page * pageSize).limit(pageSize);
     query.then(function (values) {
         res.json(values);
     }).catch(function (reason) {

@@ -394,6 +394,54 @@ export interface CommandOutput extends CommandObject {
     getError() : CommandError | undefined;
 }
 
+export class CommandObjectArray<T extends CommandObject> implements CommandObject {
+    arrayValues : T[];
+    constructor(values : T[]) {
+        this.arrayValues = values;
+    }
+    hasNumberValue(): boolean {
+        return true;
+    }    
+    getNumberValue(): number | null {
+        return this.arrayValues.length;
+    }
+    hasStringValue(): boolean {
+        return this.arrayValues.map((value) => value.hasStringValue()).reduce((pre, cur) => pre && cur);
+    }
+    getStringValue(): string | null {
+        if(this.hasStringValue) {
+            return this.arrayValues.map((value) => value.getStringValue()).join("\n");
+        } else {
+            return null;
+        }
+    }
+    getUserValue(): string {
+        return this.arrayValues.map((value) => value.getUserValue()).join("\n");
+    }
+    getValueType(): string {
+        return "Array"
+    }
+    getValue() {
+        return this.arrayValues;
+    }
+}
+
+export class CommandOutputArray<T extends CommandObject> extends CommandObjectArray<T> implements CommandOutput {
+    error? : CommandError;
+    constructor(values : T[], error? : CommandError) {
+        super(values);
+        this.error = error;
+    }
+
+    hadError(): boolean {
+        return this.error != undefined;
+    }    
+    getError(): CommandError | undefined {
+        return this.error;
+    }
+
+}
+
 export class CommandString implements CommandObject {
 
     value : string;

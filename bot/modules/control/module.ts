@@ -1,7 +1,8 @@
-import {Module, MonodroneBot, Command, CommandObject, ScopeStack, CommandCaller, CommandOutput, CommandStringOutput, SimpleCommandOutputError, UserCaller, CommandNull} from "../../monodronebot"
+import {Module, MonodroneBot, Command, CommandObject, ScopeStack, CommandCaller, CommandOutput, CommandStringOutput, SimpleCommandOutputError, UserCaller, CommandNull, CommandNumber, CommandOutputArray} from "../../monodronebot"
 import { User, Role } from "discord.js";
 import { setTimeout } from "timers";
 import * as fs from "fs";
+import { CommandInterpreter } from "../../commandinterpreter";
 
 export default class ControlModule implements Module {
     private bot! : MonodroneBot;
@@ -19,12 +20,14 @@ export default class ControlModule implements Module {
         this.bot.registerCommand(new PrintCommand());
         this.bot.registerCommand(new EchoCommand());
         this.bot.registerCommand(new SetCommand());
+        this.bot.registerCommand(new IterateCommand());
     }
 
     deregister(): void {
         this.bot.deregisterCommand("print");
         this.bot.deregisterCommand("echo");
         this.bot.deregisterCommand("set");
+        this.bot.deregisterCommand("iterate");
     }
 
     configsSave(): void {
@@ -77,6 +80,58 @@ class PrintCommand implements Command{
     getLongHelpText(): string {
         return "Prints the inputted arguments directly to the channel rather than simply returning them.";
     }
+}
+
+class IterateCommand implements Command {
+    getName(): string {
+        return "iterate"
+    }    
+    async call(input: CommandObject[], scope: ScopeStack, caller: CommandCaller, bot: MonodroneBot): Promise<CommandOutput> {
+        if(input.length < 2) {
+            return new SimpleCommandOutputError("Iterate requires atleast 2 arguments");
+        } else {
+            let iterator : Array<CommandObject>;
+            if(input[0].getValueType() == "Array") {
+                iterator = (<Array<CommandObject>>input[0].getValue());
+            } else if(input[0].getValueType() == "number"){
+                iterator = Array.from({length : input[0].getNumberValue()!},
+                (v,k) => {
+                    return new CommandNumber(k);
+                });
+            } else {
+                return new SimpleCommandOutputError("Iterate requires atleast 2 arguments");
+            }
+            let values : CommandObject[] = [];
+            for (let index = 0; index < iterator.length; index++) {
+                const element = iterator[index];
+                scope.push();
+                scope.setValue("_index", new CommandNumber(index));
+                scope.setValue("_value", element);
+                if(input[1].hasStringValue()) {
+                    values.push(await new CommandInterpreter(bot,input[1].getStringValue()!,caller,scope).interpret());
+                } else {
+                    return new SimpleCommandOutputError("Second argument was not a string!");
+                }
+                scope.pop();
+            }
+            let output = new CommandOutputArray(values);
+            return output;
+        }
+        
+    }
+    getRequiredPermission(): string {
+        return "control.iterate"
+    }
+    getShortHelpText(): string {
+        return "Iterates over a list, running a command each time."
+    }
+    getLongHelpText(): string {
+        return "Iterate [number/array/iterator] [command string] . The scope will contain the following values :\n" +
+            "_index : the index of the current iteration, 0 based\n" +
+            "_value : the value of the current iteraion"
+    }
+
+
 }
 
 class SetCommand implements Command{

@@ -36,6 +36,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var monodronebot_1 = require("../../monodronebot");
+var commandinterpreter_1 = require("../../commandinterpreter");
 var ControlModule = /** @class */ (function () {
     function ControlModule() {
     }
@@ -49,10 +50,14 @@ var ControlModule = /** @class */ (function () {
         this.bot = bot;
         this.bot.registerCommand(new PrintCommand());
         this.bot.registerCommand(new EchoCommand());
+        this.bot.registerCommand(new SetCommand());
+        this.bot.registerCommand(new IterateCommand());
     };
     ControlModule.prototype.deregister = function () {
         this.bot.deregisterCommand("print");
         this.bot.deregisterCommand("echo");
+        this.bot.deregisterCommand("set");
+        this.bot.deregisterCommand("iterate");
     };
     ControlModule.prototype.configsSave = function () {
     };
@@ -118,6 +123,75 @@ var PrintCommand = /** @class */ (function () {
     };
     return PrintCommand;
 }());
+var IterateCommand = /** @class */ (function () {
+    function IterateCommand() {
+    }
+    IterateCommand.prototype.getName = function () {
+        return "iterate";
+    };
+    IterateCommand.prototype.call = function (input, scope, caller, bot) {
+        return __awaiter(this, void 0, void 0, function () {
+            var iterator, values, index, element, _a, _b, output;
+            return __generator(this, function (_c) {
+                switch (_c.label) {
+                    case 0:
+                        if (!(input.length < 2)) return [3 /*break*/, 1];
+                        return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("Iterate requires atleast 2 arguments")];
+                    case 1:
+                        iterator = void 0;
+                        if (input[0].getValueType() == "Array") {
+                            iterator = input[0].getValue();
+                        }
+                        else if (input[0].getValueType() == "number") {
+                            iterator = Array.from({ length: input[0].getNumberValue() }, function (v, k) {
+                                return new monodronebot_1.CommandNumber(k);
+                            });
+                        }
+                        else {
+                            return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("Iterate requires atleast 2 arguments")];
+                        }
+                        values = [];
+                        index = 0;
+                        _c.label = 2;
+                    case 2:
+                        if (!(index < iterator.length)) return [3 /*break*/, 7];
+                        element = iterator[index];
+                        scope.push();
+                        scope.setValue("_index", new monodronebot_1.CommandNumber(index));
+                        scope.setValue("_value", element);
+                        if (!input[1].hasStringValue()) return [3 /*break*/, 4];
+                        _b = (_a = values).push;
+                        return [4 /*yield*/, new commandinterpreter_1.CommandInterpreter(bot, input[1].getStringValue(), caller, scope).interpret()];
+                    case 3:
+                        _b.apply(_a, [_c.sent()]);
+                        return [3 /*break*/, 5];
+                    case 4: return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("Second argument was not a string!")];
+                    case 5:
+                        scope.pop();
+                        _c.label = 6;
+                    case 6:
+                        index++;
+                        return [3 /*break*/, 2];
+                    case 7:
+                        output = new monodronebot_1.CommandOutputArray(values);
+                        return [2 /*return*/, output];
+                }
+            });
+        });
+    };
+    IterateCommand.prototype.getRequiredPermission = function () {
+        return "control.iterate";
+    };
+    IterateCommand.prototype.getShortHelpText = function () {
+        return "Iterates over a list, running a command each time.";
+    };
+    IterateCommand.prototype.getLongHelpText = function () {
+        return "Iterate [number/array/iterator] [command string] . The scope will contain the following values :\n" +
+            "_index : the index of the current iteration, 0 based\n" +
+            "_value : the value of the current iteraion";
+    };
+    return IterateCommand;
+}());
 var SetCommand = /** @class */ (function () {
     function SetCommand() {
     }
@@ -133,7 +207,8 @@ var SetCommand = /** @class */ (function () {
                 if (!input[0].hasStringValue()) {
                     return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("First argument must have a string value")];
                 }
-                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Printed")];
+                scope.setValue(input[0].getStringValue(), input[1]);
+                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Set")];
             });
         });
     };

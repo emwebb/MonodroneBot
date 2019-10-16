@@ -1,13 +1,10 @@
-Main -> AS {%
+Main -> _ AS Comment {%
     function(data) {
-        return data[0]
+        return { "dice" : data[1][0],
+				"comment" : data[2][0] }
     }
 %}
-int -> [0-9]:+ {%
-    function(data) {
-        return parseInt(data[0])
-    }
-%}
+int -> [0-9]:+ {% function(d) {return parseInt(d[0].join(""))} %}
 AS -> Add | Subtract | D {%
     function(data) {
         return data[0]
@@ -22,41 +19,41 @@ D -> Dice | P {%
 
 P -> Bracket | int {%
     function(data) {
-        return data[0]
+        return data === "number" ? data[0] : data
     }
 %}
 
-Bracket -> "(" AS ")" {%
+Bracket -> "(" _ AS _ ")" {%
     function(data) {
-        return data[1]
+        return typeof data[2] === "number" ? data[2] : data[2][0]
     }
 %}
 
-Dice -> P "d" P Choose {%
+Dice -> P _ "d" _ P _ Choose {%
     function(data) {
         return {
 			type : "Role",
-			roles : data[0],
-			range : data[2],
-			special : data[3][0]
+			roles : typeof data[0] === "number" ? data[0] : data[0][0],
+			range : typeof data[4] === "number" ? data[4] : data[4][0],
+			special : data[6][0]
 		}
     }
 %}
-Add -> AS "-" D {%
+Add -> AS _ "-" _ D {%
     function(data) {
         return {
 			type : "Subtract",
-			left : data[0],
-			right : data[2]
+			left : typeof data[0] === "number" ? data[0] : data[0][0],
+			right : typeof data[4] === "number" ? data[4] : data[4][0]
 		}
     }
 %}
-Subtract -> AS "+" D {%
+Subtract -> AS _ "+" _ D {%
     function(data) {
         return {
 			type : "Add",
-			left : data[0],
-			right : data[2]
+			left : typeof data[0] === "number" ? data[0] : data[0][0],
+			right : typeof data[4] === "number" ? data[4] : data[4][0]
 		}
     }
 %}
@@ -75,19 +72,29 @@ Disadvantage -> "disadv" {%
     }
 %}
 Choose -> null | ChooseHighest | ChooseLowest | Advantage | Disadvantage
-ChooseHighest -> "ch" P {%
+ChooseHighest -> "ch" _ P {%
     function(data) {
         return {
 			type : "ChooseHighest",
-			number : data[1][0],
+			number : typeof data[2] === "number" ? data[2] : data[2][0],
 		}
     }
 %}
-ChooseLowest -> "cl" P {%
+ChooseLowest -> "cl" _ P {%
     function(data) {
         return {
 			type : "ChooseLowest",
-			number : data[1][0],
+			number : typeof data[2] === "number" ? data[2] : data[2][0]
 		}
     }
 %}
+
+Comment -> RealComment | null
+
+RealComment -> " " [A-z\s0-9]:* {%
+    function(data) {
+        return data[1].join("");
+    }
+%}
+
+_ -> [\s]:*     {% function(d) {return null } %}

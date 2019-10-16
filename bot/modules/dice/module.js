@@ -35,279 +35,386 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-var monodronebot_1 = require("../../monodronebot");
-var discord_js_1 = require("discord.js");
-var timers_1 = require("timers");
-var fs = require("fs");
-var CoreModule = /** @class */ (function () {
-    function CoreModule() {
+var nearley = require("nearley");
+var util_1 = require("util");
+var grammar = require('./diceGrammar');
+var DiceModule = /** @class */ (function () {
+    function DiceModule() {
     }
-    CoreModule.prototype.getId = function () {
-        return "core";
+    DiceModule.prototype.getId = function () {
+        return "dice";
     };
-    CoreModule.prototype.getName = function () {
-        return "Core";
+    DiceModule.prototype.getName = function () {
+        return "Dice";
     };
-    CoreModule.prototype.register = function (bot) {
+    DiceModule.prototype.register = function (bot) {
         this.bot = bot;
-        this.bot.registerCommand(new PingCommand());
-        this.bot.registerCommand(new HelpCommand());
-        this.bot.registerCommand(new PermissionCommand());
-        this.bot.registerCommand(new RestartCommand());
-        this.bot.registerCommand(new StopCommand());
+        this.bot.registerCommand(new RollCommand());
     };
-    CoreModule.prototype.deregister = function () {
-        this.bot.deregisterCommand("ping");
-        this.bot.deregisterCommand("help");
-        this.bot.deregisterCommand("permission");
-        this.bot.deregisterCommand("restart");
-        this.bot.deregisterCommand("stop");
+    DiceModule.prototype.deregister = function () {
+        this.bot.deregisterCommand("role");
     };
-    CoreModule.prototype.configsSave = function () {
+    DiceModule.prototype.configsSave = function () {
     };
-    return CoreModule;
+    return DiceModule;
 }());
-exports.default = CoreModule;
-var PingCommand = /** @class */ (function () {
-    function PingCommand() {
+exports.default = DiceModule;
+var RollCommand = /** @class */ (function () {
+    function RollCommand() {
     }
-    PingCommand.prototype.getName = function () {
-        return "ping";
+    RollCommand.prototype.getName = function () {
+        return "roll";
     };
-    PingCommand.prototype.call = function (input, scope, caller, bot) {
+    RollCommand.prototype.call = function (input, scope, caller, bot) {
         return __awaiter(this, void 0, void 0, function () {
-            var reply;
+            var query, parser, parseResult, diceN, dice, result;
             return __generator(this, function (_a) {
-                reply = JSON.stringify(input);
-                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Pong! : " + reply)];
+                query = input.map(function (value) {
+                    return value.getStringValue();
+                }).join(" ");
+                parser = new nearley.Parser(nearley.Grammar.fromCompiled((grammar.ParserRules)));
+                parseResult = parser.feed(query).results[0];
+                diceN = convert(parseResult["dice"]);
+                if (typeof diceN == "number") {
+                    dice = {
+                        mdResult: diceN.toString(),
+                        integerResult: diceN
+                    };
+                }
+                else {
+                    dice = diceN.compute();
+                }
+                result = {
+                    comment: parseResult["comment"],
+                    dice: dice
+                };
+                return [2 /*return*/, new CommandDiceOutput(result)];
             });
         });
     };
-    PingCommand.prototype.getRequiredPermission = function () {
-        return "core.ping";
+    RollCommand.prototype.getRequiredPermission = function () {
+        return "dice.roll";
     };
-    PingCommand.prototype.getShortHelpText = function () {
-        return "Bounces back!";
+    RollCommand.prototype.getShortHelpText = function () {
+        return "Roles a dice.";
     };
-    PingCommand.prototype.getLongHelpText = function () {
-        return "Replies Pong! Plus any other argumenst you sent it.";
+    RollCommand.prototype.getLongHelpText = function () {
+        return "Roles a dice.";
     };
-    return PingCommand;
+    return RollCommand;
 }());
-var RestartCommand = /** @class */ (function () {
-    function RestartCommand() {
+var RepeatedRollCommand = /** @class */ (function () {
+    function RepeatedRollCommand() {
     }
-    RestartCommand.prototype.getName = function () {
-        return "restart";
+    RepeatedRollCommand.prototype.getName = function () {
+        return "repeatedroll";
     };
-    RestartCommand.prototype.call = function (input, scope, caller, bot) {
+    RepeatedRollCommand.prototype.call = function (input, scope, caller, bot) {
         return __awaiter(this, void 0, void 0, function () {
+            var query, parser, parseResult, diceN, dice, result;
             return __generator(this, function (_a) {
-                timers_1.setTimeout(function () {
-                    bot.stop();
-                }, 5000);
-                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Restarting in 5 Seconds.")];
+                query = input.map(function (value) {
+                    return value.getStringValue();
+                }).join(" ");
+                parser = new nearley.Parser(nearley.Grammar.fromCompiled((grammar.ParserRules)));
+                parseResult = parser.feed(query).results[0];
+                diceN = convert(parseResult["dice"]);
+                if (typeof diceN == "number") {
+                    dice = {
+                        mdResult: diceN.toString(),
+                        integerResult: diceN
+                    };
+                }
+                else {
+                    dice = diceN.compute();
+                }
+                result = {
+                    comment: parseResult["comment"],
+                    dice: dice
+                };
+                return [2 /*return*/, new CommandDiceOutput(result)];
             });
         });
     };
-    RestartCommand.prototype.getRequiredPermission = function () {
-        return "core.restart";
+    RepeatedRollCommand.prototype.getRequiredPermission = function () {
+        return "dice.repeatedroll";
     };
-    RestartCommand.prototype.getShortHelpText = function () {
-        return "Restarts the bot.";
+    RepeatedRollCommand.prototype.getShortHelpText = function () {
+        return "Roles a dice.";
     };
-    RestartCommand.prototype.getLongHelpText = function () {
-        return "Restarts the bot in 5 seconds.";
+    RepeatedRollCommand.prototype.getLongHelpText = function () {
+        return "Roles a dice.";
     };
-    return RestartCommand;
+    return RepeatedRollCommand;
 }());
-var StopCommand = /** @class */ (function () {
-    function StopCommand() {
+var CommandDiceOutput = /** @class */ (function () {
+    function CommandDiceOutput(dice) {
+        this.dice = dice;
     }
-    StopCommand.prototype.getName = function () {
-        return "stop";
+    CommandDiceOutput.prototype.hadError = function () {
+        return false;
     };
-    StopCommand.prototype.call = function (input, scope, caller, bot) {
-        return __awaiter(this, void 0, void 0, function () {
-            return __generator(this, function (_a) {
-                timers_1.setTimeout(function () {
-                    fs.readdir(".", function (err, files) {
-                        if (files.find(function (name) { return name == "restart.txt"; }) != undefined) {
-                            fs.unlinkSync("restart.txt");
-                        }
-                    });
-                    bot.stop();
-                }, 5000);
-                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Stoping in 5 Seconds.")];
+    CommandDiceOutput.prototype.getError = function () {
+        return undefined;
+    };
+    CommandDiceOutput.prototype.hasNumberValue = function () {
+        return true;
+    };
+    CommandDiceOutput.prototype.getNumberValue = function () {
+        return this.dice.dice.integerResult;
+    };
+    CommandDiceOutput.prototype.hasStringValue = function () {
+        return true;
+    };
+    CommandDiceOutput.prototype.getStringValue = function () {
+        return this.dice.dice.mdResult;
+    };
+    CommandDiceOutput.prototype.getUserValue = function () {
+        return this.dice.dice.mdResult + (this.dice.comment ? " " + this.dice.comment : "");
+    };
+    CommandDiceOutput.prototype.getValueType = function () {
+        return "DiceParserResult";
+    };
+    CommandDiceOutput.prototype.getValue = function () {
+        return this.dice;
+    };
+    return CommandDiceOutput;
+}());
+function convert(value) {
+    if (typeof value === "number") {
+        return value;
+    }
+    switch (value["type"]) {
+        case "Role":
+            return new DiceParserResultPartDice(value);
+            break;
+        case "Add":
+        case "Subtract":
+            return new DiceParserResultPartMaths(value);
+            break;
+        default:
+            throw "Unknown type " + value["type"];
+    }
+}
+var DiceParserResultChoose = /** @class */ (function () {
+    function DiceParserResultChoose(jsonValue) {
+        this.type = jsonValue["type"];
+        if (!util_1.isNullOrUndefined(jsonValue["number"])) {
+            this.number = convert(jsonValue["number"]);
+        }
+    }
+    return DiceParserResultChoose;
+}());
+var DiceParserResultPartDice = /** @class */ (function () {
+    function DiceParserResultPartDice(jsonValue) {
+        this.type = jsonValue["type"];
+        this.roles = convert(jsonValue["roles"]);
+        this.range = convert(jsonValue["range"]);
+        if (!util_1.isNullOrUndefined(jsonValue["special"])) {
+            this.special = new DiceParserResultChoose(jsonValue["special"]);
+        }
+    }
+    DiceParserResultPartDice.prototype.compute = function () {
+        var _this = this;
+        var rolesNumber;
+        var rolesMd;
+        if (typeof this.roles === "number") {
+            rolesNumber = this.roles;
+            rolesMd = this.roles.toString();
+        }
+        else {
+            var roles = this.roles.compute();
+            rolesNumber = roles.integerResult;
+            rolesMd = roles.mdResult;
+        }
+        var rangeNumber;
+        var rangeMd;
+        if (typeof this.range === "number") {
+            rangeNumber = this.range;
+            rangeMd = this.range.toString();
+        }
+        else {
+            var range = this.range.compute();
+            rangeNumber = range.integerResult;
+            rangeMd = range.mdResult;
+        }
+        if (util_1.isNullOrUndefined(this.special)) {
+            var roleArray = Array.from({ length: rolesNumber }, function () { return Math.ceil(Math.random() * rangeNumber); });
+            var mdValue = roleArray.map(function (value) {
+                if (value == 1 || value == rangeNumber) {
+                    return "**" + value + "**";
+                }
+                else {
+                    return value.toString();
+                }
+            }).join();
+            var integerValue = roleArray.reduce(function (pre, current) {
+                return pre + current;
             });
-        });
-    };
-    StopCommand.prototype.getRequiredPermission = function () {
-        return "core.stop";
-    };
-    StopCommand.prototype.getShortHelpText = function () {
-        return "Stops the bot.";
-    };
-    StopCommand.prototype.getLongHelpText = function () {
-        return "Stops the bot in 5 seconds.";
-    };
-    return StopCommand;
-}());
-var HelpCommand = /** @class */ (function () {
-    function HelpCommand() {
-    }
-    HelpCommand.prototype.getName = function () {
-        return "help";
-    };
-    HelpCommand.prototype.call = function (input, scope, caller, bot) {
-        return __awaiter(this, void 0, void 0, function () {
-            var iterator, value, helpString, specificCommandName, specificCommand, command;
-            return __generator(this, function (_a) {
-                iterator = bot.getCommands().values();
-                helpString = "";
-                if (input.length >= 1) {
-                    specificCommandName = input[0];
-                    if (specificCommandName.hasStringValue()) {
-                        specificCommand = bot.getCommands().get(specificCommandName.getStringValue());
-                        if (specificCommand == undefined) {
-                            return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("Command does not exist")];
+            mdValue = "(" + rolesMd + "d" + rangeMd + " : (" + mdValue + ") : `" + integerValue + "` )";
+            return {
+                mdResult: mdValue,
+                integerResult: integerValue
+            };
+        }
+        else {
+            if (this.special.type == "ChooseHighest" || this.special.type == "ChooseLowest") {
+                var roleArray = Array.from({ length: rolesNumber }, function () { return Math.ceil(Math.random() * rangeNumber); });
+                var roleArraySorted = roleArray.map(function (value, index) {
+                    return {
+                        value: value,
+                        index: index
+                    };
+                }).sort(function (a, b) { return (a.value - b.value) * ((_this.special.type == "ChooseLowest") ? 1 : -1); });
+                var specialInteger_1 = this.special.number;
+                var specialMd = specialInteger_1.toString();
+                if (typeof specialInteger_1 !== "number") {
+                    var special = specialInteger_1.compute();
+                    specialInteger_1 = special.integerResult;
+                    specialMd = special.mdResult;
+                }
+                var roleArrayUnsorted = roleArraySorted.map(function (value, index) {
+                    return {
+                        index: value.index,
+                        value: value.value,
+                        kill: index >= specialInteger_1
+                    };
+                }).sort(function (a, b) { return a.index - b.index; });
+                var mdValue = roleArrayUnsorted.map(function (value) {
+                    var md;
+                    if (value.value == 1 || value.value == rangeNumber) {
+                        md = "**" + value.value + "**";
+                    }
+                    else {
+                        md = value.value.toString();
+                    }
+                    if (value.kill) {
+                        return "~~" + md + "~~";
+                    }
+                    else {
+                        return md;
+                    }
+                }).join();
+                var integerValue = roleArrayUnsorted.reduce(function (pre, cur) {
+                    if (!pre.kill) {
+                        if (!cur.kill) {
+                            return {
+                                kill: false,
+                                index: 0,
+                                value: pre.value + cur.value
+                            };
                         }
                         else {
-                            return [2 /*return*/, new monodronebot_1.CommandStringOutput(bot.getCommandIndicator() + specificCommand.getName() + " - " + specificCommand.getLongHelpText())];
+                            return pre;
                         }
                     }
-                }
-                while (true) {
-                    value = iterator.next();
-                    if (value.done) {
-                        break;
+                    else {
+                        if (!cur.kill) {
+                            return {
+                                kill: false,
+                                index: 0,
+                                value: cur.value
+                            };
+                        }
+                        else {
+                            return {
+                                kill: false,
+                                index: 0,
+                                value: 0
+                            };
+                        }
                     }
-                    command = value.value;
-                    helpString += bot.getCommandIndicator() + command.getName() + " - " + command.getShortHelpText() + "\n";
+                }).value;
+                var chooseValue = (this.special.type == "ChooseLowest") ? "cl" : "ch";
+                mdValue = "(" + rolesMd + "d" + rangeMd + chooseValue + specialMd + " : (" + mdValue + ") : `" + integerValue + "` )";
+                return {
+                    mdResult: mdValue,
+                    integerResult: integerValue
+                };
+            }
+            else {
+                var results = Array.from({ length: 2 }, function () {
+                    var roleArray = Array.from({ length: rolesNumber }, function () { return Math.ceil(Math.random() * rangeNumber); });
+                    var mdValue = "(" + roleArray.map(function (value) {
+                        if (value == 1 || value == rangeNumber) {
+                            return "**" + value + "**";
+                        }
+                        else {
+                            return value.toString();
+                        }
+                    }).join() + ")";
+                    var integerValue = roleArray.reduce(function (pre, current) {
+                        return pre + current;
+                    });
+                    return {
+                        mdvalue: mdValue,
+                        integerValue: integerValue
+                    };
+                });
+                var integerValue = void 0;
+                if ((results[0].integerValue < results[1].integerValue) != (this.special.type == "Disadvantage")) {
+                    integerValue = results[1].integerValue;
+                    results[0].mdvalue = "~~" + results[0].mdvalue + "~~";
                 }
-                return [2 /*return*/, new monodronebot_1.CommandStringOutput(helpString)];
-            });
-        });
+                else {
+                    integerValue = results[0].integerValue;
+                    results[1].mdvalue = "~~" + results[1].mdvalue + "~~";
+                }
+                var chooseValue = (this.special.type == "Disadvantage") ? "disadv" : "adv";
+                var mdValue = "(" + rolesMd + "d" + rangeMd + chooseValue + " : " + results[0].mdvalue + "," + results[1].mdvalue + " : `" + integerValue + "` )";
+                return {
+                    mdResult: mdValue,
+                    integerResult: integerValue
+                };
+            }
+        }
     };
-    HelpCommand.prototype.getRequiredPermission = function () {
-        return "core.help";
-    };
-    HelpCommand.prototype.getShortHelpText = function () {
-        return "Shows a list of commands and description.";
-    };
-    HelpCommand.prototype.getLongHelpText = function () {
-        return "Shows a list of commands and descriptions.";
-    };
-    return HelpCommand;
+    return DiceParserResultPartDice;
 }());
-var PermissionCommand = /** @class */ (function () {
-    function PermissionCommand() {
+var DiceParserResultPartMaths = /** @class */ (function () {
+    function DiceParserResultPartMaths(jsonValue) {
+        this.type = jsonValue["type"];
+        this.left = convert(jsonValue["left"]);
+        this.right = convert(jsonValue["right"]);
     }
-    PermissionCommand.prototype.getName = function () {
-        return "permission";
+    DiceParserResultPartMaths.prototype.compute = function () {
+        var leftNumber;
+        var leftMd;
+        if (typeof this.left === "number") {
+            leftNumber = this.left;
+            leftMd = this.left.toString();
+        }
+        else {
+            var left = this.left.compute();
+            leftNumber = left.integerResult;
+            leftMd = left.mdResult;
+        }
+        var rightNumber;
+        var rightMd;
+        if (typeof this.right === "number") {
+            rightNumber = this.right;
+            rightMd = this.right.toString();
+        }
+        else {
+            var right = this.right.compute();
+            rightNumber = right.integerResult;
+            rightMd = right.mdResult;
+        }
+        if (this.type == "Add") {
+            return {
+                integerResult: leftNumber + rightNumber,
+                mdResult: "(" + leftMd + " + " + rightMd + " : `" + (leftNumber + rightNumber) + "`)"
+            };
+        }
+        else if (this.type == "Subtract") {
+            return {
+                integerResult: leftNumber - rightNumber,
+                mdResult: "(" + leftMd + " - " + rightMd + " : `" + (leftNumber - rightNumber) + "`)"
+            };
+        }
+        else {
+            throw "Unknown type " + this.type;
+        }
     };
-    PermissionCommand.prototype.call = function (input, scope, caller, bot) {
-        return __awaiter(this, void 0, void 0, function () {
-            var subCommand, grantee, granteeValue, permissionManager, grant, n, permissionObject;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        if (input.length < 2) {
-                            return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("Need atleast 2 arguments", "Error : This command needs atleast 2 argumenst")];
-                        }
-                        if (!(caller instanceof monodronebot_1.UserCaller)) {
-                            return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("This command can only be called from a discord guild.", "Error : This command can only be called from a discord guild.")];
-                        }
-                        subCommand = input[0];
-                        grantee = input[1];
-                        if (!(subCommand.hasStringValue() && grantee.hasStringValue())) return [3 /*break*/, 4];
-                        granteeValue = void 0;
-                        return [4 /*yield*/, bot.getUserFromString(grantee.getStringValue(), caller.getRawMessage().guild)];
-                    case 1:
-                        granteeValue = _a.sent();
-                        if (!(granteeValue == undefined)) return [3 /*break*/, 3];
-                        return [4 /*yield*/, bot.getRoleFromString(grantee.getStringValue(), caller.getRawMessage().guild)];
-                    case 2:
-                        granteeValue = _a.sent();
-                        _a.label = 3;
-                    case 3:
-                        if (granteeValue == undefined) {
-                            if (grantee.getStringValue() == "everyone" || grantee.getStringValue() == "@everyone") {
-                                granteeValue = "everyone";
-                            }
-                        }
-                        if (granteeValue == undefined) {
-                            return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("Could not resolve '" + grantee.getUserValue() + "' to Role or User", "Error : Could not resolve '" + grantee.getUserValue() + "' to Role or User")];
-                        }
-                        permissionManager = bot.getPermissionManager();
-                        grant = false;
-                        switch (subCommand.getStringValue().toLocaleLowerCase()) {
-                            case "grant":
-                                grant = true;
-                            case "revoke":
-                                for (n = 2; n < input.length; n++) {
-                                    permissionObject = input[n];
-                                    if (permissionObject.hasStringValue()) {
-                                        if (grant) {
-                                            if (granteeValue instanceof discord_js_1.User) {
-                                                permissionManager.grantPermissionToUser(granteeValue, permissionObject.getStringValue());
-                                                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Granted " + permissionObject.getStringValue() + " to user " + granteeValue.tag)];
-                                            }
-                                            if (granteeValue instanceof discord_js_1.Role) {
-                                                permissionManager.grantPermissionToRole(granteeValue, permissionObject.getStringValue());
-                                                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Granted " + permissionObject.getStringValue() + " to role" + granteeValue.name)];
-                                            }
-                                            if (granteeValue == "everyone") {
-                                                permissionManager.grantPermissionToEveryone(permissionObject.getStringValue());
-                                                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Granted " + permissionObject.getStringValue() + " to " + granteeValue)];
-                                            }
-                                        }
-                                        else {
-                                            if (granteeValue instanceof discord_js_1.User) {
-                                                permissionManager.removePermissionToUser(granteeValue, permissionObject.getStringValue());
-                                                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Revoked " + permissionObject.getStringValue() + " from user " + granteeValue.tag)];
-                                            }
-                                            if (granteeValue instanceof discord_js_1.Role) {
-                                                permissionManager.removePermissionToRole(granteeValue, permissionObject.getStringValue());
-                                                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Revoked " + permissionObject.getStringValue() + " from role" + granteeValue.name)];
-                                            }
-                                            if (granteeValue == "everyone") {
-                                                permissionManager.removePermissionToEveryone(permissionObject.getStringValue());
-                                                return [2 /*return*/, new monodronebot_1.CommandStringOutput("Revoked " + permissionObject.getStringValue() + " from " + granteeValue)];
-                                            }
-                                        }
-                                    }
-                                }
-                                break;
-                            case "list":
-                                if (granteeValue instanceof discord_js_1.User) {
-                                    return [2 /*return*/, new monodronebot_1.CommandStringOutput(granteeValue.tag + " has permissions :\n" + permissionManager.listPermissionForUser(granteeValue).join("\n"))];
-                                }
-                                if (granteeValue instanceof discord_js_1.Role) {
-                                    return [2 /*return*/, new monodronebot_1.CommandStringOutput(granteeValue.name + " has permissions :\n" + permissionManager.listPermissionForRole(granteeValue).join("\n"))];
-                                }
-                                if (granteeValue == "everyone") {
-                                    return [2 /*return*/, new monodronebot_1.CommandStringOutput(granteeValue + " has permissions :\n" + permissionManager.listPermissionForEveryone().join("\n"))];
-                                }
-                                break;
-                            default:
-                                break;
-                        }
-                        return [3 /*break*/, 5];
-                    case 4: return [2 /*return*/, new monodronebot_1.SimpleCommandOutputError("First and Second argument must have string value!", "Error : First and Second argument must have string value! Got '" + subCommand.getUserValue() + "' and '" + grantee.getUserValue() + "' instead.")];
-                    case 5: return [2 /*return*/, new monodronebot_1.CommandStringOutput("")];
-                }
-            });
-        });
-    };
-    PermissionCommand.prototype.getRequiredPermission = function () {
-        return "core.permission";
-    };
-    PermissionCommand.prototype.getShortHelpText = function () {
-        return "Grant , Remove or List permissions a role or user has.";
-    };
-    PermissionCommand.prototype.getLongHelpText = function () {
-        return "$permission <grant/revoke/list> <username/userid/role name/role id/everyone> [permission name..]";
-    };
-    return PermissionCommand;
+    return DiceParserResultPartMaths;
 }());

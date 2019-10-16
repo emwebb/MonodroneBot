@@ -16,9 +16,11 @@ import CoreModule from "./modules/core/module";
 import ControlModule from "./modules/control/module";
 import CharacterConnectionModule from "./modules/characterConnection/module";
 import InCharacterChat from "./modules/inCharacterChat/module"
+import DiceModule from "./modules/dice/module"
 bot.registerModule(new CoreModule());
 bot.registerModule(new ControlModule());
 bot.registerModule(new CharacterConnectionModule());
 bot.registerModule(new InCharacterChat());
+bot.registerModule(new DiceModule());
 
 bot.login();

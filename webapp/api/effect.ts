@@ -7,14 +7,7 @@ import consts from "../../common/const";
 let effectRouter = Router();
 
 effectRouter.post("/",authorize(consts.roles.executive,true), (req,res) => {
-    let effect = new Effect();
-
-    effect.name = req.body["name"]
-    effect.type = req.body["type"];
-    effect.ability = req.body["ability"];
-    effect.bonus = req.body["bonus"];
-    effect.conditionDescription = req.body["conditionDescription"];
-    
+    let effect = new Effect(req.body);
     let error = effect.validateSync();
     if(error) {
         res.sendStatus(400);
@@ -63,11 +56,7 @@ effectRouter.put("/:effectId",authorize(consts.roles.default,true),(req,res) => 
                 _id : effectId
             });
         }
-        effect.name = req.body["name"]
-        effect.type = req.body["type"];
-        effect.ability = req.body["ability"];
-        effect.bonus = req.body["bonus"];
-        effect.conditionDescription = req.body["conditionDescription"];
+        effect.set(req.body);
 
         let error = effect.validateSync();
 
@@ -100,10 +89,13 @@ effectRouter.delete("/:effectId",authorize(consts.roles.default,true),(req,res) 
 
 effectRouter.get("/",authorize(consts.roles.default,true),(req,res) => {
     let query = Effect.find()
+    let pageSize = req.query.pageSize || 20;
+    let page = req.query.page || 0;
+    
     if(req.query.name) {
-        query.where('name',{ $regex : req.query.name , $options : "i"})
+        query = query.where('name',{ $regex : req.query.name , $options : "i"})
     }
-
+    query = query.skip(page*pageSize).limit(pageSize);
     query.then((values) => {
         res.json(values);
 

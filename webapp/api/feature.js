@@ -7,16 +7,7 @@ var mongoose = require("mongoose");
 var const_1 = require("../../common/const");
 var featureRouter = express_1.Router();
 featureRouter.post("/", authorize_1.authorize(const_1.default.roles.executive, true), function (req, res) {
-    var feature = new feature_1.default();
-    feature.name = req.body["name"];
-    feature.displayName = req.body["displayName"];
-    feature.description = req.body["description"];
-    feature.display = req.body["display"];
-    feature.levelUnlock = req.body["levelUnlock"];
-    feature.upgradeOf = req.body["upgradeOf"];
-    feature.options = req.body["options"];
-    feature.optionMax = req.body["optionMax"];
-    feature.effects = req.body["effects"];
+    var feature = new feature_1.default(req.body);
     if (feature.validateSync()) {
         res.sendStatus(400);
     }
@@ -58,15 +49,7 @@ featureRouter.put("/:featureId", authorize_1.authorize(const_1.default.roles.def
                 _id: featureId
             });
         }
-        feature.name = req.body["name"];
-        feature.displayName = req.body["displayName"];
-        feature.description = req.body["description"];
-        feature.display = req.body["display"];
-        feature.levelUnlock = req.body["levelUnlock"];
-        feature.upgradeOf = req.body["upgradeOf"];
-        feature.options = req.body["options"];
-        feature.optionMax = req.body["optionMax"];
-        feature.effects = req.body["effects"];
+        feature.set(req.body);
         if (feature.validateSync()) {
             res.sendStatus(400);
         }
@@ -101,9 +84,12 @@ featureRouter.delete("/:featureId", authorize_1.authorize(const_1.default.roles.
 });
 featureRouter.get("/", authorize_1.authorize(const_1.default.roles.default, true), function (req, res) {
     var query = feature_1.default.find();
+    var pageSize = req.query.pageSize || 20;
+    var page = req.query.page || 0;
     if (req.query.name) {
-        query.where('name', { $regex: req.query.name, $options: "i" });
+        query = query.where('name', { $regex: req.query.name, $options: "i" });
     }
+    query = query.skip(page * pageSize).limit(pageSize);
     query.then(function (values) {
         res.json(values);
     }).catch(function (reason) {
